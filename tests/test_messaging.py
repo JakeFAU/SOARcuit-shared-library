@@ -1,6 +1,7 @@
 """Tests for consolidated messaging logic."""
 
 from typing import Any
+from unittest.mock import patch
 
 import pytest
 from pydantic import ValidationError
@@ -108,7 +109,14 @@ def test_build_outbound_observation_normalization() -> None:
 
 def test_get_pubsub_client_singleton() -> None:
     """Verify that get_pubsub_client returns the same object instance."""
-    client1 = get_pubsub_client()
-    client2 = get_pubsub_client()
-    assert client1 is client2
-    assert id(client1) == id(client2)
+    with patch("shared.messaging.pubsub.pubsub_v1.PublisherClient") as mock_publisher:
+        # Reset global state for test isolation
+        from shared.messaging import pubsub
+
+        pubsub._pubsub_client = None
+
+        client1 = get_pubsub_client()
+        client2 = get_pubsub_client()
+
+        assert client1 is client2
+        assert mock_publisher.call_count == 1
