@@ -1,13 +1,48 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
 [project]
-name = "lib"
+name = "soarcuit-shared"
 version = "0.1.0"
-description = "Add your description here"
+description = "Shared canonical models and message parsing for SOARcuit services"
 readme = "README.md"
 requires-python = ">=3.14"
-dependencies = [
-    "google-cloud-pubsub>=2.37.0",
-    "google-genai>=1.72.0",
-    "pgvector>=0.4.2",
-    "structlog>=25.5.0",
-    "structlog-gcp>=0.5.0",
+dependencies = []
+
+[dependency-groups]
+dev = [
+    "mypy",
+    "pytest",
+    "ruff",
 ]
+
+[tool.hatch.build.targets.wheel]
+packages = ["shared"]
+
+[[tool.uv.index]]
+name = "soarcuit-dev-python-repo"
+url = "https://us-east4-python.pkg.dev/soarcuit/soarcuit-dev-python-repo/simple/"
+publish-url = "https://us-east4-python.pkg.dev/soarcuit/soarcuit-dev-python-repo/"
+explicit = true
+
+[tool.mypy]
+python_version = "3.14"
+files = ["shared"]
+pretty = true
+warn_unused_configs = true
+
+[tool.pytest.ini_options]
+minversion = "8.0"
+addopts = ["-ra", "--strict-config", "--strict-markers"]
+pythonpath = ["."]
+testpaths = ["tests"]
+
+[tool.ruff]
+target-version = "py314"
+line-length = 100
+src = ["shared", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP"]
+ignore = ["E501"]
