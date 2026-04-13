@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime
-from uuid import UUID, uuid7  # type: ignore
+from uuid import UUID, uuid7
 
 
 def utc_now() -> datetime:

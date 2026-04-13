@@ -2,7 +2,7 @@
 
 import base64
 import os
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 from cloudevents.http import CloudEvent
@@ -10,7 +10,7 @@ from shared.domain.inference import clean_observations, configure_lm
 from shared.domain.tracing import decode_pubsub_message
 
 
-def test_configure_lm_success():
+def test_configure_lm_success() -> None:
     """Verify configure_lm correctly initializes DSPy."""
     with patch.dict(os.environ, {"GOOGLE_GENAI_KEY": "test-key", "MODEL_NAME": "test-model"}):
         with patch("dspy.LM") as mock_lm, patch("dspy.configure") as mock_configure:
@@ -26,7 +26,7 @@ def test_configure_lm_success():
             assert shared.domain.inference._lm_initialized is True
 
 
-def test_configure_lm_missing_key():
+def test_configure_lm_missing_key() -> None:
     """Verify configure_lm raises ValueError if API key is missing."""
     with patch.dict(os.environ, {}, clear=True):
         import shared.domain.inference
@@ -37,7 +37,7 @@ def test_configure_lm_missing_key():
             configure_lm()
 
 
-def test_clean_observations():
+def test_clean_observations() -> None:
     """Verify clean_observations correctly clamps, normalizes and deduplicates."""
     raw_observations = [
         {
@@ -91,32 +91,22 @@ def test_clean_observations():
     assert cleaned[1]["evidence"] == "Fact 2"  # Defaulted from empty evidence
 
 
-def test_decode_pubsub_message_success():
+def test_decode_pubsub_message_success() -> None:
     """Verify decode_pubsub_message correctly decodes base64 data."""
     test_data = "Hello, World!"
     encoded_data = base64.b64encode(test_data.encode("utf-8")).decode("utf-8")
 
-    cloud_event = CloudEvent(
-        attributes={
-            "type": "google.cloud.pubsub.topic.v1.messagePublished",
-            "source": "test-source",
-        },
-        data={"message": {"data": encoded_data}},
-    )
+    cloud_event = MagicMock(spec=CloudEvent)
+    cloud_event.data = {"message": {"data": encoded_data}}
 
     decoded = decode_pubsub_message(cloud_event)
     assert decoded == test_data
 
 
-def test_decode_pubsub_message_failure():
+def test_decode_pubsub_message_failure() -> None:
     """Verify decode_pubsub_message raises ValueError on invalid data."""
-    cloud_event = CloudEvent(
-        attributes={
-            "type": "google.cloud.pubsub.topic.v1.messagePublished",
-            "source": "test-source",
-        },
-        data={"not-a-message": {}},
-    )
+    cloud_event = MagicMock(spec=CloudEvent)
+    cloud_event.data = {"not-a-message": {}}
 
     with pytest.raises(ValueError, match="No data found in Cloud Event message"):
         decode_pubsub_message(cloud_event)

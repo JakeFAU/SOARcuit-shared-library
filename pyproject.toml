@@ -38,7 +38,9 @@ explicit = true
 
 [tool.mypy]
 python_version = "3.14"
-files = ["shared"]
+strict = true
+ignore_missing_imports = true
+disable_error_code = ["import-untyped", "import-not-found"]
 pretty = true
 warn_unused_configs = true
 

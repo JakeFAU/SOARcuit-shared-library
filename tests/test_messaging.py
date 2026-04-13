@@ -1,15 +1,17 @@
 """Tests for consolidated messaging logic."""
 
+from typing import Any
+
 import pytest
 from pydantic import ValidationError
 from shared.messaging.pubsub import build_outbound_observation, get_pubsub_client
 from shared.messaging.schemas import RawObservation
 
 
-def test_raw_observation_validation():
+def test_raw_observation_validation() -> None:
     """Verify that RawObservation correctly validates fields."""
     # Valid observation
-    valid_data = {
+    valid_data: dict[str, Any] = {
         "fact": "Leadership is decentralized.",
         "probability": 0.8,
         "kind": "logical_inference",
@@ -48,9 +50,9 @@ def test_raw_observation_validation():
         RawObservation(**invalid_data)
 
 
-def test_build_outbound_observation():
+def test_build_outbound_observation() -> None:
     """Verify that build_outbound_observation correctly maps fields and validates."""
-    raw_obs = {
+    raw_obs: dict[str, Any] = {
         "fact": "Consistent reasoning observed.",
         "probability": 0.9,
         "kind": "explicit_fact",
@@ -82,9 +84,9 @@ def test_build_outbound_observation():
     assert payload["metadata"]["source_kind"] == "explicit_fact"
 
 
-def test_build_outbound_observation_normalization():
+def test_build_outbound_observation_normalization() -> None:
     """Verify that build_outbound_observation handles dirty input kindly."""
-    dirty_obs = {
+    dirty_obs: dict[str, Any] = {
         "fact": "  Messy fact  ",
         "kind": "UNKNOWN_KIND",
         "probability": "0.7",  # String instead of float
@@ -104,7 +106,7 @@ def test_build_outbound_observation_normalization():
     assert payload["analyst"] == "test-analyst"
 
 
-def test_get_pubsub_client_singleton():
+def test_get_pubsub_client_singleton() -> None:
     """Verify that get_pubsub_client returns the same object instance."""
     client1 = get_pubsub_client()
     client2 = get_pubsub_client()
