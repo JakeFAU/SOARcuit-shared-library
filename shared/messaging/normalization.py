@@ -215,9 +215,7 @@ def _normalize_embedding_value(value: object) -> object:
         if normalized_mapping and all(_is_int_like(key) for key in normalized_mapping):
             ordered_values = [
                 item
-                for _, item in sorted(
-                    normalized_mapping.items(), key=lambda entry: int(entry[0])
-                )
+                for _, item in sorted(normalized_mapping.items(), key=lambda entry: int(entry[0]))
             ]
             return _normalize_embedding_value(ordered_values)
         return value
@@ -227,9 +225,7 @@ def _normalize_embedding_value(value: object) -> object:
         if len(items) == 1 and isinstance(items[0], (Mapping, list, tuple, str)):
             return _normalize_embedding_value(items[0])
         return [
-            _normalize_embedding_value(item)
-            if isinstance(item, (Mapping, list, tuple))
-            else item
+            _normalize_embedding_value(item) if isinstance(item, (Mapping, list, tuple)) else item
             for item in items
         ]
 
@@ -261,7 +257,7 @@ def _parse_embedding_serialization(value: str) -> object | None:
 
     try:
         parsed = ast.literal_eval(value)
-    except (SyntaxError, ValueError):
+    except SyntaxError, ValueError:
         return None
     if isinstance(parsed, (list, tuple, Mapping)):
         return parsed
@@ -295,11 +291,7 @@ def _tokenize_embedding_string(value: str) -> list[str] | None:
 
 def _strip_wrapping_quotes(value: str) -> str:
     normalized = value.strip()
-    if (
-        len(normalized) >= 2
-        and normalized[0] == normalized[-1]
-        and normalized[0] in {"'", '"'}
-    ):
+    if len(normalized) >= 2 and normalized[0] == normalized[-1] and normalized[0] in {"'", '"'}:
         return normalized[1:-1].strip()
     return normalized
 
@@ -337,9 +329,7 @@ def _normalize_transcript_like_payload(
 
     source_kind = _extract_text(payload, KIND_ALIAS_KEYS) or "logical_inference"
     normalized_kind = (
-        "explicit_fact"
-        if source_kind.strip().lower() == "explicit_fact"
-        else "logical_inference"
+        "explicit_fact" if source_kind.strip().lower() == "explicit_fact" else "logical_inference"
     )
     evidence = _extract_text(payload, EVIDENCE_ALIAS_KEYS) or fact
     analyst = _extract_text(payload, ANALYST_ALIAS_KEYS) or "unknown"
@@ -449,6 +439,6 @@ def _extract_float(
             try:
                 if isinstance(value, (int, float, str)):
                     return max(0.0, min(1.0, float(value)))
-            except (TypeError, ValueError):
+            except TypeError, ValueError:
                 continue
     return default

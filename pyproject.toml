@@ -8,7 +8,17 @@ version = "0.1.0"
 description = "Shared canonical models and message parsing for SOARcuit services"
 readme = "README.md"
 requires-python = ">=3.14"
-dependencies = []
+dependencies = [
+    "cloudevents>=1.11.0",
+    "dspy>=2.6.0",
+    "functions-framework>=3.9.0",
+    "google-cloud-pubsub>=2.37.0",
+    "marshmallow>=4.3.0",
+    "opentelemetry-api>=1.41.0",
+    "opentelemetry-sdk>=1.41.0",
+    "pydantic>=2.10.0",
+    "structlog>=25.5.0",
+]
 
 [dependency-groups]
 dev = [
@@ -27,8 +37,11 @@ publish-url = "https://us-east4-python.pkg.dev/soarcuit/soarcuit-dev-python-repo
 explicit = true
 
 [tool.mypy]
+exclude = ["tests/"]
 python_version = "3.14"
-files = ["shared"]
+strict = true
+ignore_missing_imports = true
+disable_error_code = ["import-untyped", "import-not-found"]
 pretty = true
 warn_unused_configs = true
 

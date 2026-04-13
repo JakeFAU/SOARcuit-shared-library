@@ -124,17 +124,13 @@ def optional_datetime(value: object | None, field_name: str) -> datetime | None:
     return require_datetime(value, field_name)
 
 
-def require_enum[EnumT: StrEnum](
-    enum_cls: type[EnumT], value: object, field_name: str
-) -> EnumT:
+def require_enum[EnumT: StrEnum](enum_cls: type[EnumT], value: object, field_name: str) -> EnumT:
     """Return a validated string enum."""
 
     if isinstance(value, enum_cls):
         return value
     if not isinstance(value, str):
-        raise ValidationError(
-            f"{field_name} must be one of {[item.value for item in enum_cls]}."
-        )
+        raise ValidationError(f"{field_name} must be one of {[item.value for item in enum_cls]}.")
     try:
         return enum_cls(value.strip().lower())
     except ValueError as exc:

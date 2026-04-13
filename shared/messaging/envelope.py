@@ -29,15 +29,11 @@ def unwrap_pubsub_envelope(payload: object) -> dict[str, object]:
             raise PayloadDecodeError("Push envelope field 'message' must be an object.")
         encoded_data = envelope.get("data")
         if not isinstance(encoded_data, str):
-            raise PayloadDecodeError(
-                "Push envelope is missing string field 'message.data'."
-            )
+            raise PayloadDecodeError("Push envelope is missing string field 'message.data'.")
         normalized = decode_pubsub_message_data(encoded_data.encode("utf-8"))
         attributes = envelope.get("attributes")
         if isinstance(attributes, Mapping):
-            normalized["attributes"] = {
-                str(key): value for key, value in attributes.items()
-            }
+            normalized["attributes"] = {str(key): value for key, value in attributes.items()}
         return normalized
 
     if (
@@ -66,13 +62,9 @@ def _parse_jsonish_bytes(message_data: bytes) -> object:
     try:
         raw_json = base64.b64decode(decoded, validate=True).decode("utf-8")
     except (binascii.Error, UnicodeDecodeError) as exc:
-        raise PayloadDecodeError(
-            "Pub/Sub payload must be JSON or base64-encoded JSON."
-        ) from exc
+        raise PayloadDecodeError("Pub/Sub payload must be JSON or base64-encoded JSON.") from exc
 
     try:
         return json.loads(raw_json)
     except json.JSONDecodeError as exc:
-        raise PayloadDecodeError(
-            "Base64 Pub/Sub payload did not contain valid JSON."
-        ) from exc
+        raise PayloadDecodeError("Base64 Pub/Sub payload did not contain valid JSON.") from exc

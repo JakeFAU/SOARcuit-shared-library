@@ -31,9 +31,7 @@ def detect_message_kind(payload: Mapping[str, object]) -> MessageKind:
             return MessageKind.RAW_OBSERVATION
         if normalized in MEME_MESSAGE_TYPES:
             return MessageKind.MEME
-        raise UnsupportedMessageTypeError(
-            f"Unsupported message_type {explicit_kind!r}."
-        )
+        raise UnsupportedMessageTypeError(f"Unsupported message_type {explicit_kind!r}.")
 
     if has_raw_shape(normalized_payload):
         return MessageKind.RAW_OBSERVATION

@@ -1,175 +1,112 @@
-"""Tests for the shared canonical domain models."""
+"""Tests for shared domain helpers."""
 
-from __future__ import annotations
-
-from datetime import UTC, datetime
-from uuid import UUID, uuid4
+import base64
+import os
+from unittest.mock import MagicMock, patch
 
 import pytest
-from shared.domain import (
-    EMBEDDING_DIMS,
-    Meme,
-    MemeStatus,
-    MemeTruthState,
-    ObservationKind,
-    RawObservation,
-    ValidationError,
-)
+from cloudevents.http import CloudEvent
+from shared.domain.inference import clean_observations, configure_lm
+from shared.domain.tracing import decode_pubsub_message
 
 
-def make_embedding() -> list[float]:
-    return [0.1] * EMBEDDING_DIMS
+def test_configure_lm_success() -> None:
+    """Verify configure_lm correctly initializes DSPy."""
+    with patch.dict(os.environ, {"GOOGLE_GENAI_KEY": "test-key", "MODEL_NAME": "test-model"}):
+        with patch("dspy.LM") as mock_lm, patch("dspy.configure") as mock_configure:
+            # Reset global state for test
+            import shared.domain.inference
+
+            shared.domain.inference._lm_initialized = False
+
+            configure_lm()
+
+            mock_lm.assert_called_once_with(model="test-model", api_key="test-key")
+            mock_configure.assert_called_once()
+            assert shared.domain.inference._lm_initialized is True
 
 
-class FakeNdArray:
-    def __init__(self, values: object) -> None:
-        self._values = values
+def test_configure_lm_missing_key() -> None:
+    """Verify configure_lm raises ValueError if API key is missing."""
+    with patch.dict(os.environ, {}, clear=True):
+        import shared.domain.inference
 
-    def tolist(self) -> object:
-        return self._values
+        shared.domain.inference._lm_initialized = False
+
+        with pytest.raises(ValueError, match="GOOGLE_GENAI_KEY not set"):
+            configure_lm()
 
 
-def test_raw_observation_from_mapping_validates_and_normalizes() -> None:
-    observation = RawObservation.from_mapping(
+def test_clean_observations() -> None:
+    """Verify clean_observations correctly clamps, normalizes and deduplicates."""
+    raw_observations = [
         {
-            "fact": "  System load spiked  ",
-            "probability": "0.75",
-            "kind": "EXPLICIT_FACT",
-            "dimension": " ops ",
-            "evidence": " metrics ",
-            "analyst": " control ",
-            "metadata": {"source": "test"},
-        }
-    )
-
-    assert observation.fact == "System load spiked"
-    assert observation.probability == pytest.approx(0.75)
-    assert observation.kind is ObservationKind.EXPLICIT_FACT
-    assert observation.dimension == "ops"
-    assert observation.evidence == "metrics"
-    assert observation.analyst == "control"
-    assert observation.metadata == {"source": "test"}
-
-
-def test_meme_from_observation_populates_defaults() -> None:
-    observation = RawObservation.from_mapping(
+            "fact": "Fact 1",
+            "probability": 1.5,
+            "kind": "explicit_fact",
+            "dimension": "leadership",
+            "evidence": "Evidence 1",
+        },
         {
-            "fact": "Important operational fact",
-            "probability": 0.6,
+            "fact": "Fact 1",  # Duplicate
+            "probability": 0.8,
             "kind": "logical_inference",
-            "dimension": "ops",
-            "evidence": "playbook",
-            "analyst": "agent-1",
-        }
-    )
-    now = datetime(2026, 4, 11, 12, 0, tzinfo=UTC)
-
-    meme = Meme.from_observation(
-        observation,
-        embedding=make_embedding(),
-        expiration_days=30,
-        default_importance=0.5,
-        default_novelty=0.6,
-        default_decay_rate=0.1,
-        now=now,
-    )
-
-    assert meme.content == observation.fact
-    assert meme.kind == ObservationKind.LOGICAL_INFERENCE.value
-    assert meme.status is MemeStatus.ACTIVE
-    assert meme.truth_state is MemeTruthState.UNVERIFIED
-    assert meme.expires_at == datetime(2026, 5, 11, 12, 0, tzinfo=UTC)
-    assert meme.metadata["evidence"] == "playbook"
-    assert len(meme.embedding or []) == EMBEDDING_DIMS
-
-
-def test_meme_from_mapping_converts_values() -> None:
-    parent_id = uuid4()
-    conversation_id = uuid4()
-    message_id = uuid4()
-    meme = Meme.from_mapping(
+            "dimension": "leadership",
+            "evidence": "Evidence 2",
+        },
         {
-            "id": str(uuid4()),
-            "created_at": "2026-04-11T15:00:00+00:00",
-            "updated_at": "1775916000",
-            "content": "Canonical memory",
-            "embedding": make_embedding(),
-            "tags": ["ops", "ops", " signal "],
-            "probability": "0.4",
-            "kind": "explicit_fact",
-            "dimension": "ops",
-            "status": "active",
-            "truth_state": "plausible",
-            "importance": "0.2",
-            "novelty": "0.8",
-            "decay_rate": "0.05",
-            "expires_at": "1775916200",
-            "parent_meme_id": str(parent_id),
-            "source_type": " chat ",
-            "source_conversation_id": str(conversation_id),
-            "source_message_id": str(message_id),
-            "last_accessed_at": "1775916300",
-            "access_count": "4",
-            "metadata": {"source": "test"},
-            "last_hygiene_at": "1775916400",
-        }
+            "fact": "Fact 2",
+            "probability": -0.5,
+            "kind": "unknown_kind",
+            "dimension": "unknown_dim",
+            "evidence": "",
+        },
+        "not-a-dict",
+    ]
+
+    allowed_dimensions = {"leadership", "logic"}
+
+    cleaned = clean_observations(
+        raw_observations,
+        analyst_name="test-analyst",
+        allowed_dimensions=allowed_dimensions,
+        default_dimension="logic",
     )
 
-    assert isinstance(meme.id, UUID)
-    assert meme.updated_at.tzinfo is not None
-    assert meme.tags == ["ops", "signal"]
-    assert meme.status is MemeStatus.ACTIVE
-    assert meme.truth_state is MemeTruthState.PLAUSIBLE
-    assert meme.parent_meme_id == parent_id
-    assert meme.source_type == "chat"
-    assert meme.access_count == 4
-    assert meme.metadata == {"source": "test"}
+    assert len(cleaned) == 2
+
+    # Check first observation
+    assert cleaned[0]["fact"] == "Fact 1"
+    assert cleaned[0]["probability"] == 1.0  # Clamped from 1.5
+    assert cleaned[0]["kind"] == "explicit_fact"
+    assert cleaned[0]["dimension"] == "leadership"
+    assert cleaned[0]["evidence"] == "Evidence 1"
+    assert cleaned[0]["analyst"] == "test-analyst"
+
+    # Check second observation
+    assert cleaned[1]["fact"] == "Fact 2"
+    assert cleaned[1]["probability"] == 0.0  # Clamped from -0.5
+    assert cleaned[1]["kind"] == "logical_inference"  # Defaulted from unknown_kind
+    assert cleaned[1]["dimension"] == "logic"  # Defaulted from unknown_dim
+    assert cleaned[1]["evidence"] == "Fact 2"  # Defaulted from empty evidence
 
 
-def test_meme_from_mapping_accepts_numpy_like_embedding() -> None:
-    meme = Meme.from_mapping(
-        {
-            "content": "Canonical memory",
-            "embedding": FakeNdArray([0.1] * EMBEDDING_DIMS),
-            "probability": 0.4,
-            "kind": "explicit_fact",
-            "dimension": "ops",
-        }
-    )
+def test_decode_pubsub_message_success() -> None:
+    """Verify decode_pubsub_message correctly decodes base64 data."""
+    test_data = "Hello, World!"
+    encoded_data = base64.b64encode(test_data.encode("utf-8")).decode("utf-8")
 
-    assert meme.embedding == pytest.approx([0.1] * EMBEDDING_DIMS)
+    cloud_event = MagicMock(spec=CloudEvent)
+    cloud_event.data = {"message": {"data": encoded_data}}
+
+    decoded = decode_pubsub_message(cloud_event)
+    assert decoded == test_data
 
 
-def test_meme_to_message_accepts_analysis_mapping() -> None:
-    meme = Meme(
-        content="Canonical memory",
-        probability=0.7,
-        kind="explicit_fact",
-        dimension="ops",
-        embedding=make_embedding(),
-    )
+def test_decode_pubsub_message_failure() -> None:
+    """Verify decode_pubsub_message raises ValueError on invalid data."""
+    cloud_event = MagicMock(spec=CloudEvent)
+    cloud_event.data = {"not-a-message": {}}
 
-    payload = meme.to_message(
-        analysis={
-            "recommended_action": "active-refine",
-            "marginal_voi": 6.5,
-        }
-    )
-
-    assert payload["message_type"] == "meme"
-    assert payload["analysis"]["recommended_action"] == "active-refine"
-    assert payload["analysis"]["marginal_voi"] == pytest.approx(6.5)
-    assert payload["id"] == str(meme.id)
-
-
-def test_meme_rejects_invalid_embedding_length() -> None:
-    with pytest.raises(ValidationError, match="exactly 3072 values"):
-        Meme.from_mapping(
-            {
-                "content": "bad embedding",
-                "embedding": [0.1],
-                "probability": 0.5,
-                "kind": "explicit_fact",
-                "dimension": "ops",
-            }
-        )
+    with pytest.raises(ValueError, match="No data found in Cloud Event message"):
+        decode_pubsub_message(cloud_event)

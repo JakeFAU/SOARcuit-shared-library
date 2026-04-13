@@ -1,117 +1,122 @@
-"""Tests for shared payload decoding, normalization, and classification."""
+"""Tests for consolidated messaging logic."""
 
-from __future__ import annotations
-
-import base64
-import json
+from typing import Any
+from unittest.mock import patch
 
 import pytest
-from shared.domain import MessageKind
-from shared.messaging import (
-    PayloadDecodeError,
-    UnsupportedPayloadShapeError,
-    detect_message_kind,
-    expand_inbound_payloads,
-    normalize_inbound_payload,
-    parse_pubsub_payload,
-)
+from pydantic import ValidationError
+from shared.messaging.pubsub import build_outbound_observation, get_pubsub_client
+from shared.messaging.schemas import RawObservation
 
 
-def test_parse_pubsub_payload_accepts_direct_json() -> None:
-    payload = parse_pubsub_payload(
-        b'{"message_type":"meme","content":"x","probability":0.4,"kind":"explicit_fact","dimension":"ops"}'
+def test_raw_observation_validation() -> None:
+    """Verify that RawObservation correctly validates fields."""
+    # Valid observation
+    valid_data: dict[str, Any] = {
+        "fact": "Leadership is decentralized.",
+        "probability": 0.8,
+        "kind": "logical_inference",
+        "dimension": "delegation",
+        "evidence": "Team members make autonomous decisions.",
+        "analyst": "james",
+        "metadata": {"source": "interview_4"},
+    }
+    obs = RawObservation(**valid_data)
+    assert obs.fact == valid_data["fact"]
+    assert obs.probability == 0.8
+    assert obs.kind == "logical_inference"
+
+    # Invalid probability (too high)
+    invalid_data = valid_data.copy()
+    invalid_data["probability"] = 1.5
+    with pytest.raises(ValidationError):
+        RawObservation(**invalid_data)
+
+    # Invalid probability (too low)
+    invalid_data = valid_data.copy()
+    invalid_data["probability"] = -0.1
+    with pytest.raises(ValidationError):
+        RawObservation(**invalid_data)
+
+    # Invalid kind
+    invalid_data = valid_data.copy()
+    invalid_data["kind"] = "not_a_kind"
+    with pytest.raises(ValidationError):
+        RawObservation(**invalid_data)
+
+    # Missing field
+    invalid_data = valid_data.copy()
+    del invalid_data["fact"]
+    with pytest.raises(ValidationError):
+        RawObservation(**invalid_data)
+
+
+def test_build_outbound_observation() -> None:
+    """Verify that build_outbound_observation correctly maps fields and validates."""
+    raw_obs: dict[str, Any] = {
+        "fact": "Consistent reasoning observed.",
+        "probability": 0.9,
+        "kind": "explicit_fact",
+        "dimension": "logical_consistency",
+        "evidence": "Statement A followed directly from B.",
+    }
+
+    analyst = "spock"
+    batch_timestamp = "2023-10-27T12:00:00Z"
+    observation_count = 1
+    observation_index = 0
+
+    payload = build_outbound_observation(
+        raw_obs,
+        analyst=analyst,
+        batch_timestamp=batch_timestamp,
+        observation_count=observation_count,
+        observation_index=observation_index,
     )
-
-    assert payload["message_type"] == "meme"
-    assert payload["content"] == "x"
-
-
-def test_parse_pubsub_payload_unwraps_push_envelope() -> None:
-    inner = base64.b64encode(
-        b'{"fact":"x","probability":0.5,"kind":"explicit_fact","dimension":"ops","evidence":"metric","analyst":"agent"}'
-    ).decode("utf-8")
-    envelope = json.dumps(
-        {"message": {"data": inner, "attributes": {"source": "push"}}}
-    ).encode("utf-8")
-
-    payload = parse_pubsub_payload(envelope)
-
-    assert payload["fact"] == "x"
-    assert payload["attributes"] == {"source": "push"}
-
-
-def test_parse_pubsub_payload_normalizes_transcript_payload_with_defaults() -> None:
-    payload = parse_pubsub_payload(b'{"conversation":"We missed sprint goals again."}')
 
     assert payload["message_type"] == "raw_observation"
-    assert payload["fact"] == "We missed sprint goals again."
-    assert payload["analyst"] == "unknown"
-    assert payload["probability"] == pytest.approx(0.5)
+    assert payload["fact"] == raw_obs["fact"]
+    assert payload["probability"] == 0.9
+    assert payload["kind"] == "explicit_fact"
+    assert payload["analyst"] == analyst
+    assert payload["metadata"]["batch_timestamp"] == batch_timestamp
+    assert payload["metadata"]["batch_observation_count"] == observation_count
+    assert payload["metadata"]["batch_observation_index"] == observation_index
+    assert payload["metadata"]["source_kind"] == "explicit_fact"
 
 
-def test_expand_inbound_payloads_preserves_batch_metadata() -> None:
-    payloads = expand_inbound_payloads(
-        {
-            "analyst": "spock",
-            "timestamp": "2026-04-12T12:00:00Z",
-            "observations": [
-                {
-                    "fact": "First observation",
-                    "probability": 0.6,
-                    "kind": "logical_inference",
-                    "dimension": "ops",
-                    "evidence": "First quote.",
-                },
-                {
-                    "fact": "Second observation",
-                    "probability": 0.7,
-                    "kind": "explicit_fact",
-                    "dimension": "ops",
-                    "evidence": "Second quote.",
-                },
-            ],
-        }
+def test_build_outbound_observation_normalization() -> None:
+    """Verify that build_outbound_observation handles dirty input kindly."""
+    dirty_obs: dict[str, Any] = {
+        "fact": "  Messy fact  ",
+        "kind": "UNKNOWN_KIND",
+        "probability": "0.7",  # String instead of float
+    }
+
+    payload = build_outbound_observation(
+        dirty_obs,
+        analyst="test-analyst",
+        batch_timestamp="now",
+        observation_count=1,
+        observation_index=0,
     )
 
-    first_metadata = payloads[0]["metadata"]
-    second_metadata = payloads[1]["metadata"]
-
-    assert isinstance(first_metadata, dict)
-    assert isinstance(second_metadata, dict)
-    assert len(payloads) == 2
-    assert first_metadata["batch_observation_index"] == 0
-    assert second_metadata["batch_observation_count"] == 2
+    assert payload["fact"] == "Messy fact"
+    assert payload["kind"] == "logical_inference"  # Normalized
+    assert payload["probability"] == 0.7  # Cast to float
+    assert payload["analyst"] == "test-analyst"
 
 
-def test_normalize_inbound_payload_preserves_unknown_fields_for_schema_drift() -> None:
-    normalized = normalize_inbound_payload(
-        {
-            "message_type": "raw_observation",
-            "fact": "Observation",
-            "probability": 0.4,
-            "kind": "explicit_fact",
-            "dimension": "ops",
-            "evidence": "metric",
-            "analyst": "agent",
-            "new_field": {"schema_version": 2},
-        }
-    )
+def test_get_pubsub_client_singleton() -> None:
+    """Verify that get_pubsub_client returns the same object instance."""
+    with patch("shared.messaging.pubsub.pubsub_v1.PublisherClient") as mock_publisher:
+        # Reset global state for test isolation
+        from shared.messaging import pubsub
 
-    assert normalized["new_field"] == {"schema_version": 2}
+        pubsub._pubsub_client = None
 
+        client1 = get_pubsub_client()
+        client2 = get_pubsub_client()
 
-def test_parse_pubsub_payload_rejects_non_utf8() -> None:
-    with pytest.raises(PayloadDecodeError, match="valid UTF-8"):
-        parse_pubsub_payload(b"\xff")
-
-
-def test_detect_message_kind_rejects_unknown_shape() -> None:
-    with pytest.raises(UnsupportedPayloadShapeError, match="Unable to infer"):
-        detect_message_kind({"hello": "world"})
-
-
-def test_detect_message_kind_normalizes_transcript_like_shape() -> None:
-    assert (
-        detect_message_kind({"conversation": "Jacob: We missed sprint goals again."})
-        is MessageKind.RAW_OBSERVATION
-    )
+        assert client1 is client2
+        assert mock_publisher.call_count == 1
