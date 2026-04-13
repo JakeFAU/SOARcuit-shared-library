@@ -57,12 +57,12 @@ def test_build_outbound_observation():
         "dimension": "logical_consistency",
         "evidence": "Statement A followed directly from B.",
     }
-    
+
     analyst = "spock"
     batch_timestamp = "2023-10-27T12:00:00Z"
     observation_count = 1
     observation_index = 0
-    
+
     payload = build_outbound_observation(
         raw_obs,
         analyst=analyst,
@@ -70,7 +70,7 @@ def test_build_outbound_observation():
         observation_count=observation_count,
         observation_index=observation_index,
     )
-    
+
     assert payload["message_type"] == "raw_observation"
     assert payload["fact"] == raw_obs["fact"]
     assert payload["probability"] == 0.9
@@ -89,7 +89,7 @@ def test_build_outbound_observation_normalization():
         "kind": "UNKNOWN_KIND",
         "probability": "0.7",  # String instead of float
     }
-    
+
     payload = build_outbound_observation(
         dirty_obs,
         analyst="test-analyst",
@@ -97,7 +97,7 @@ def test_build_outbound_observation_normalization():
         observation_count=1,
         observation_index=0,
     )
-    
+
     assert payload["fact"] == "Messy fact"
     assert payload["kind"] == "logical_inference"  # Normalized
     assert payload["probability"] == 0.7  # Cast to float

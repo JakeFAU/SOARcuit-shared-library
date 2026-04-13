@@ -11,6 +11,7 @@ from structlog import get_logger
 # Note: In Cloud Functions, you might want to call get_logger(analyst_name)
 # to differentiate logs. These provide consistent formatting and instrumentation.
 
+
 def initialize_tracing(service_name: str) -> trace.Tracer:
     """Get a tracer instance for the specified service name."""
     return trace.get_tracer(service_name)

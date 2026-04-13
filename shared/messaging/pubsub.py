@@ -38,9 +38,7 @@ def build_outbound_observation(
 ) -> dict[str, Any]:
     """Convert an analyst observation into the Thalamus raw_observation contract."""
     source_kind = str(observation.get("kind", "")).strip()
-    normalized_kind = (
-        "explicit_fact" if source_kind == "explicit_fact" else "logical_inference"
-    )
+    normalized_kind = "explicit_fact" if source_kind == "explicit_fact" else "logical_inference"
     raw_metadata = observation.get("metadata")
     metadata = dict(raw_metadata) if isinstance(raw_metadata, Mapping) else {}
     metadata.update(
@@ -63,10 +61,10 @@ def build_outbound_observation(
         "analyst": analyst,
         "metadata": metadata,
     }
-    
+
     # Validate using Pydantic
     raw_obs = RawObservation(**obs_data)
-    
+
     payload = raw_obs.model_dump()
     payload["message_type"] = "raw_observation"
     return payload
@@ -96,7 +94,7 @@ def publish_observations(
         for index, observation in enumerate(observations)
         if isinstance(observation, Mapping)
     ]
-    
+
     if not outbound_messages:
         logger.info("No valid observations to publish")
         return []

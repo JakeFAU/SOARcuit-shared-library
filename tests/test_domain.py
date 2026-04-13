@@ -2,7 +2,7 @@
 
 import base64
 import os
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 import pytest
 from cloudevents.http import CloudEvent
@@ -16,10 +16,11 @@ def test_configure_lm_success():
         with patch("dspy.LM") as mock_lm, patch("dspy.configure") as mock_configure:
             # Reset global state for test
             import shared.domain.inference
+
             shared.domain.inference._lm_initialized = False
-            
+
             configure_lm()
-            
+
             mock_lm.assert_called_once_with(model="test-model", api_key="test-key")
             mock_configure.assert_called_once()
             assert shared.domain.inference._lm_initialized is True
@@ -29,8 +30,9 @@ def test_configure_lm_missing_key():
     """Verify configure_lm raises ValueError if API key is missing."""
     with patch.dict(os.environ, {}, clear=True):
         import shared.domain.inference
+
         shared.domain.inference._lm_initialized = False
-        
+
         with pytest.raises(ValueError, match="GOOGLE_GENAI_KEY not set"):
             configure_lm()
 
@@ -43,36 +45,36 @@ def test_clean_observations():
             "probability": 1.5,
             "kind": "explicit_fact",
             "dimension": "leadership",
-            "evidence": "Evidence 1"
+            "evidence": "Evidence 1",
         },
         {
             "fact": "Fact 1",  # Duplicate
             "probability": 0.8,
             "kind": "logical_inference",
             "dimension": "leadership",
-            "evidence": "Evidence 2"
+            "evidence": "Evidence 2",
         },
         {
             "fact": "Fact 2",
             "probability": -0.5,
             "kind": "unknown_kind",
             "dimension": "unknown_dim",
-            "evidence": ""
+            "evidence": "",
         },
-        "not-a-dict"
+        "not-a-dict",
     ]
-    
+
     allowed_dimensions = {"leadership", "logic"}
-    
+
     cleaned = clean_observations(
         raw_observations,
         analyst_name="test-analyst",
         allowed_dimensions=allowed_dimensions,
-        default_dimension="logic"
+        default_dimension="logic",
     )
-    
+
     assert len(cleaned) == 2
-    
+
     # Check first observation
     assert cleaned[0]["fact"] == "Fact 1"
     assert cleaned[0]["probability"] == 1.0  # Clamped from 1.5
@@ -80,7 +82,7 @@ def test_clean_observations():
     assert cleaned[0]["dimension"] == "leadership"
     assert cleaned[0]["evidence"] == "Evidence 1"
     assert cleaned[0]["analyst"] == "test-analyst"
-    
+
     # Check second observation
     assert cleaned[1]["fact"] == "Fact 2"
     assert cleaned[1]["probability"] == 0.0  # Clamped from -0.5
@@ -93,15 +95,15 @@ def test_decode_pubsub_message_success():
     """Verify decode_pubsub_message correctly decodes base64 data."""
     test_data = "Hello, World!"
     encoded_data = base64.b64encode(test_data.encode("utf-8")).decode("utf-8")
-    
+
     cloud_event = CloudEvent(
         attributes={
             "type": "google.cloud.pubsub.topic.v1.messagePublished",
-            "source": "test-source"
+            "source": "test-source",
         },
-        data={"message": {"data": encoded_data}}
+        data={"message": {"data": encoded_data}},
     )
-    
+
     decoded = decode_pubsub_message(cloud_event)
     assert decoded == test_data
 
@@ -111,10 +113,10 @@ def test_decode_pubsub_message_failure():
     cloud_event = CloudEvent(
         attributes={
             "type": "google.cloud.pubsub.topic.v1.messagePublished",
-            "source": "test-source"
+            "source": "test-source",
         },
-        data={"not-a-message": {}}
+        data={"not-a-message": {}},
     )
-    
+
     with pytest.raises(ValueError, match="No data found in Cloud Event message"):
         decode_pubsub_message(cloud_event)

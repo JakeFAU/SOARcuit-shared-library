@@ -13,4 +13,3 @@ class UnsupportedMessageTypeError(ValidationError):
 
 class UnsupportedPayloadShapeError(ValidationError):
     """Raised when the payload shape cannot be normalized into a known contract."""
-

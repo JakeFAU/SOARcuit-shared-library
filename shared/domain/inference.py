@@ -80,7 +80,7 @@ def clean_observations(
 
         try:
             probability = float(raw.get("probability", 0.5))
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             probability = 0.5
 
         probability = max(0.0, min(1.0, probability))

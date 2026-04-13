@@ -44,9 +44,7 @@ class RawObservation:
 
     def __post_init__(self) -> None:
         self.fact = require_text(self.fact, "fact")
-        self.probability = require_float(
-            self.probability, "probability", minimum=0.0, maximum=1.0
-        )
+        self.probability = require_float(self.probability, "probability", minimum=0.0, maximum=1.0)
         self.kind = require_enum(ObservationKind, self.kind, "kind")
         self.dimension = require_text(self.dimension, "dimension")
         self.evidence = require_text(self.evidence, "evidence")
@@ -101,9 +99,7 @@ class Meme:
 
     def __post_init__(self) -> None:
         self.content = require_text(self.content, "content")
-        self.probability = require_float(
-            self.probability, "probability", minimum=0.0, maximum=1.0
-        )
+        self.probability = require_float(self.probability, "probability", minimum=0.0, maximum=1.0)
         self.kind = require_text(self.kind, "kind")
         self.dimension = require_text(self.dimension, "dimension")
         self.id = require_uuid(self.id, "id")
@@ -114,9 +110,7 @@ class Meme:
         self.content_hash = self.content_hash or sha256(self.content.encode("utf-8")).hexdigest()
         self.embedding = require_embedding(self.embedding, dimensions=EMBEDDING_DIMS)
         self.tags = require_tags(self.tags)
-        self.importance = optional_float(
-            self.importance, "importance", minimum=0.0, maximum=1.0
-        )
+        self.importance = optional_float(self.importance, "importance", minimum=0.0, maximum=1.0)
         self.novelty = optional_float(self.novelty, "novelty", minimum=0.0, maximum=1.0)
         self.decay_rate = optional_float(self.decay_rate, "decay_rate", minimum=0.0)
         self.expires_at = optional_datetime(self.expires_at, "expires_at")
@@ -125,28 +119,18 @@ class Meme:
         self.source_conversation_id = optional_uuid(
             self.source_conversation_id, "source_conversation_id"
         )
-        self.source_message_id = optional_uuid(
-            self.source_message_id, "source_message_id"
-        )
-        self.last_accessed_at = optional_datetime(
-            self.last_accessed_at, "last_accessed_at"
-        )
+        self.source_message_id = optional_uuid(self.source_message_id, "source_message_id")
+        self.last_accessed_at = optional_datetime(self.last_accessed_at, "last_accessed_at")
         self.access_count = require_int(self.access_count, "access_count", minimum=0)
         self.metadata = require_mapping(self.metadata, "metadata")
-        self.last_hygiene_at = optional_datetime(
-            self.last_hygiene_at, "last_hygiene_at"
-        )
+        self.last_hygiene_at = optional_datetime(self.last_hygiene_at, "last_hygiene_at")
 
     @classmethod
     def from_mapping(cls, payload: Mapping[str, object]) -> Meme:
         """Build a meme from an untrusted payload."""
 
-        created_at = (
-            optional_datetime(payload.get("created_at"), "created_at") or utc_now()
-        )
-        updated_at = (
-            optional_datetime(payload.get("updated_at"), "updated_at") or created_at
-        )
+        created_at = optional_datetime(payload.get("created_at"), "created_at") or utc_now()
+        updated_at = optional_datetime(payload.get("updated_at"), "updated_at") or created_at
         return cls(
             id=require_uuid(payload["id"], "id") if "id" in payload else generate_id(),
             created_at=created_at,
@@ -160,9 +144,7 @@ class Meme:
             ),
             kind=require_text(payload.get("kind"), "kind"),
             dimension=require_text(payload.get("dimension"), "dimension"),
-            status=require_enum(
-                MemeStatus, payload.get("status", MemeStatus.ACTIVE), "status"
-            ),
+            status=require_enum(MemeStatus, payload.get("status", MemeStatus.ACTIVE), "status"),
             truth_state=require_enum(
                 MemeTruthState,
                 payload.get("truth_state", MemeTruthState.UNVERIFIED),
@@ -171,33 +153,19 @@ class Meme:
             importance=optional_float(
                 payload.get("importance"), "importance", minimum=0.0, maximum=1.0
             ),
-            novelty=optional_float(
-                payload.get("novelty"), "novelty", minimum=0.0, maximum=1.0
-            ),
-            decay_rate=optional_float(
-                payload.get("decay_rate"), "decay_rate", minimum=0.0
-            ),
+            novelty=optional_float(payload.get("novelty"), "novelty", minimum=0.0, maximum=1.0),
+            decay_rate=optional_float(payload.get("decay_rate"), "decay_rate", minimum=0.0),
             expires_at=optional_datetime(payload.get("expires_at"), "expires_at"),
-            parent_meme_id=optional_uuid(
-                payload.get("parent_meme_id"), "parent_meme_id"
-            ),
+            parent_meme_id=optional_uuid(payload.get("parent_meme_id"), "parent_meme_id"),
             source_type=optional_text(payload.get("source_type"), "source_type"),
             source_conversation_id=optional_uuid(
                 payload.get("source_conversation_id"), "source_conversation_id"
             ),
-            source_message_id=optional_uuid(
-                payload.get("source_message_id"), "source_message_id"
-            ),
-            last_accessed_at=optional_datetime(
-                payload.get("last_accessed_at"), "last_accessed_at"
-            ),
-            access_count=require_int(
-                payload.get("access_count", 0), "access_count", minimum=0
-            ),
+            source_message_id=optional_uuid(payload.get("source_message_id"), "source_message_id"),
+            last_accessed_at=optional_datetime(payload.get("last_accessed_at"), "last_accessed_at"),
+            access_count=require_int(payload.get("access_count", 0), "access_count", minimum=0),
             metadata=require_mapping(payload.get("metadata"), "metadata"),
-            last_hygiene_at=optional_datetime(
-                payload.get("last_hygiene_at"), "last_hygiene_at"
-            ),
+            last_hygiene_at=optional_datetime(payload.get("last_hygiene_at"), "last_hygiene_at"),
         )
 
     @classmethod
@@ -292,21 +260,15 @@ class Meme:
             "parent_meme_id": str(self.parent_meme_id) if self.parent_meme_id else None,
             "source_type": self.source_type,
             "source_conversation_id": (
-                str(self.source_conversation_id)
-                if self.source_conversation_id
-                else None
+                str(self.source_conversation_id) if self.source_conversation_id else None
             ),
-            "source_message_id": (
-                str(self.source_message_id) if self.source_message_id else None
-            ),
+            "source_message_id": (str(self.source_message_id) if self.source_message_id else None),
             "last_accessed_at": (
                 self.last_accessed_at.isoformat() if self.last_accessed_at else None
             ),
             "access_count": self.access_count,
             "metadata": self.metadata,
-            "last_hygiene_at": (
-                self.last_hygiene_at.isoformat() if self.last_hygiene_at else None
-            ),
+            "last_hygiene_at": (self.last_hygiene_at.isoformat() if self.last_hygiene_at else None),
         }
         if analysis is not None:
             payload["analysis"] = _normalize_analysis_payload(analysis)
