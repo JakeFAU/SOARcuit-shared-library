@@ -73,9 +73,14 @@ def test_expand_inbound_payloads_preserves_batch_metadata() -> None:
         }
     )
 
+    first_metadata = payloads[0]["metadata"]
+    second_metadata = payloads[1]["metadata"]
+
+    assert isinstance(first_metadata, dict)
+    assert isinstance(second_metadata, dict)
     assert len(payloads) == 2
-    assert payloads[0]["metadata"]["batch_observation_index"] == 0
-    assert payloads[1]["metadata"]["batch_observation_count"] == 2
+    assert first_metadata["batch_observation_index"] == 0
+    assert second_metadata["batch_observation_count"] == 2
 
 
 def test_normalize_inbound_payload_preserves_unknown_fields_for_schema_drift() -> None:

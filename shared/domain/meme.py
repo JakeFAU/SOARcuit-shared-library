@@ -148,7 +148,7 @@ class Meme:
             optional_datetime(payload.get("updated_at"), "updated_at") or created_at
         )
         return cls(
-            id=payload.get("id", generate_id()),
+            id=require_uuid(payload["id"], "id") if "id" in payload else generate_id(),
             created_at=created_at,
             updated_at=updated_at,
             content=require_text(payload.get("content"), "content"),
