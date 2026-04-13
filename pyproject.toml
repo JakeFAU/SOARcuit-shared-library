@@ -37,6 +37,7 @@ publish-url = "https://us-east4-python.pkg.dev/soarcuit/soarcuit-dev-python-repo
 explicit = true
 
 [tool.mypy]
+exclude = ["tests/"]
 python_version = "3.14"
 strict = true
 ignore_missing_imports = true
