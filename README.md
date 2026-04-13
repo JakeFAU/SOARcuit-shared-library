@@ -14,3 +14,7 @@ Out of scope:
 - routing policy
 - telemetry setup
 - persistence implementations and schema-specific helpers
+
+## Deployment
+
+Publish to provate artifactory at  <https://us-east4-python.pkg.dev/soarcuit/soarcuit-dev-python-repo/simple/>
