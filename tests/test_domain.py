@@ -5,7 +5,6 @@ from unittest.mock import MagicMock, patch
 import pytest
 from cloudevents.http import CloudEvent
 from pydantic import ValidationError
-
 from shared.domain.inference import clean_observations, configure_lm
 from shared.domain.tracing import decode_pubsub_message
 

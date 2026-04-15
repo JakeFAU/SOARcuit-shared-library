@@ -1,7 +1,7 @@
 """Pub/Sub messaging helpers for SOARcuit."""
 
 import json
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from datetime import UTC, datetime
 from typing import Any
 
@@ -9,6 +9,7 @@ from google.cloud import pubsub_v1
 from opentelemetry import trace
 from structlog import get_logger
 
+from shared.domain.meme import Meme
 from shared.messaging.schemas import RawObservation
 
 logger = get_logger(__name__)
@@ -70,8 +71,46 @@ def build_outbound_observation(
     return payload
 
 
+def publish_memes(
+    memes: Sequence[Meme],
+    *,
+    topic_path: str,
+    source: str,
+) -> list[str]:
+    """Publish memes to the downstream topic with tracing."""
+    if not memes:
+        logger.info("No memes to publish")
+        return []
+
+    with tracer.start_as_current_span("pubsub_publish_memes"):
+        client = get_pubsub_client()
+        futures = []
+        for index, meme in enumerate(memes):
+            payload = meme.to_message()
+            futures.append(
+                client.publish(
+                    topic_path,
+                    json.dumps(payload).encode("utf-8"),
+                    source=source,
+                    meme_count=str(len(memes)),
+                    meme_index=str(index),
+                    message_type="meme",
+                    meme_id=str(meme.id),
+                )
+            )
+        message_ids = [future.result(timeout=10) for future in futures]
+
+    logger.info(
+        "Published memes",
+        topic=topic_path,
+        count=len(message_ids),
+        message_ids=message_ids,
+    )
+    return message_ids
+
+
 def publish_observations(
-    observations: list[Mapping[str, Any]],
+    observations: Sequence[Mapping[str, Any]],
     *,
     topic_path: str,
     analyst: str,

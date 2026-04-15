@@ -1,14 +1,13 @@
 """Consolidated inference helpers for DSPy-based analysts."""
 
-import os
 from typing import Any
 
 import dspy
 from structlog import get_logger
 
-logger = get_logger(__name__)
-
 from shared.domain.config import SOARcuitBaseSettings
+
+logger = get_logger(__name__)
 
 # Global cache for cold-start optimization
 _lm_initialized = False

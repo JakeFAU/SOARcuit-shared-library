@@ -1,7 +1,9 @@
-import pytest
 import os
+
+import pytest
 from pydantic import ValidationError
 from shared.domain.config import SOARcuitBaseSettings
+
 
 def test_missing_required_key():
     # Ensure GOOGLE_GENAI_KEY is NOT in environment
