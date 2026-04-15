@@ -29,7 +29,8 @@ class SOARcuitBaseSettings(BaseSettings):
         ..., 
         validation_alias=AliasChoices(
             "google_genai_key", "GOOGLE_GENAI_KEY",
-            "THALAMUS_GOOGLE_GENAI_KEY", "HIPPOCAMPUS_GOOGLE_GENAI_KEY", "CORTEX_GOOGLE_GENAI_KEY"
+            "THALAMUS_GOOGLE_GENAI_KEY", "HIPPOCAMPUS_GOOGLE_GENAI_KEY", "CORTEX_GOOGLE_GENAI_KEY",
+            "GOOGLE_API_KEY", "THALAMUS_GOOGLE_API_KEY", "HIPPOCAMPUS_GOOGLE_API_KEY", "CORTEX_GOOGLE_API_KEY"
         )
     )
     model_name: str = Field(
