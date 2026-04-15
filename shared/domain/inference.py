@@ -26,7 +26,7 @@ def configure_lm(settings: SOARcuitBaseSettings | None = None) -> None:
 
     if settings is None:
         try:
-            settings = SOARcuitBaseSettings() # type: ignore[call-arg]
+            settings = SOARcuitBaseSettings()  # type: ignore[call-arg]
         except Exception as e:
             logger.error("Failed to load settings for LM configuration", error=str(e))
             raise
