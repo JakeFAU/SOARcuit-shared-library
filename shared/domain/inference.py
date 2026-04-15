@@ -1,10 +1,11 @@
 """Consolidated inference helpers for DSPy-based analysts."""
 
-import os
 from typing import Any
 
 import dspy
 from structlog import get_logger
+
+from shared.domain.config import SOARcuitBaseSettings
 
 logger = get_logger(__name__)
 
@@ -12,23 +13,26 @@ logger = get_logger(__name__)
 _lm_initialized = False
 
 
-def configure_lm() -> None:
-    """Initialize DSPy using the environment variables.
+def configure_lm(settings: SOARcuitBaseSettings | None = None) -> None:
+    """Initialize DSPy using the environment variables or provided settings.
 
-    Expects:
-    - MODEL_NAME: The model identifier (e.g., 'gemini/gemini-3-flash-preview')
-    - GOOGLE_GENAI_KEY: The API key for Google GenAI
+    Args:
+        settings: Optional SOARcuitBaseSettings instance. If not provided,
+                 it will attempt to load from environment/YAML.
     """
     global _lm_initialized
     if _lm_initialized:
         return
 
-    model_name = os.getenv("MODEL_NAME", "gemini/gemini-3-flash-preview")
-    api_key = os.getenv("GOOGLE_GENAI_KEY")
+    if settings is None:
+        try:
+            settings = SOARcuitBaseSettings() # type: ignore[call-arg]
+        except Exception as e:
+            logger.error("Failed to load settings for LM configuration", error=str(e))
+            raise
 
-    if not api_key:
-        logger.error("Missing GOOGLE_GENAI_KEY environment variable")
-        raise ValueError("GOOGLE_GENAI_KEY not set")
+    model_name = settings.model_name
+    api_key = settings.google_genai_key.get_secret_value()
 
     lm = dspy.LM(model=model_name, api_key=api_key)
     dspy.configure(lm=lm)

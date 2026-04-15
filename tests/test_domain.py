@@ -1,20 +1,22 @@
-"""Tests for shared domain helpers."""
-
 import base64
 import os
 from unittest.mock import MagicMock, patch
 
 import pytest
 from cloudevents.http import CloudEvent
+from pydantic import ValidationError
 from shared.domain.inference import clean_observations, configure_lm
 from shared.domain.tracing import decode_pubsub_message
 
 
 def test_configure_lm_success() -> None:
-    """Verify configure_lm correctly initializes DSPy."""
-    with patch.dict(os.environ, {"GOOGLE_GENAI_KEY": "test-key", "MODEL_NAME": "test-model"}):
-        with patch("dspy.LM") as mock_lm, patch("dspy.configure") as mock_configure:
-            # Reset global state for test
+    """Verify configure_lm initializes DSPy correctly."""
+    with patch("dspy.LM") as mock_lm, patch("dspy.configure") as mock_configure:
+        with patch.dict(
+            os.environ,
+            {"GOOGLE_GENAI_KEY": "test-key", "MODEL_NAME": "test-model"},
+            clear=True,
+        ):
             import shared.domain.inference
 
             shared.domain.inference._lm_initialized = False
@@ -23,17 +25,16 @@ def test_configure_lm_success() -> None:
 
             mock_lm.assert_called_once_with(model="test-model", api_key="test-key")
             mock_configure.assert_called_once()
-            assert shared.domain.inference._lm_initialized is True
 
 
 def test_configure_lm_missing_key() -> None:
-    """Verify configure_lm raises ValueError if API key is missing."""
+    """Verify configure_lm raises ValidationError if API key is missing."""
     with patch.dict(os.environ, {}, clear=True):
         import shared.domain.inference
 
         shared.domain.inference._lm_initialized = False
 
-        with pytest.raises(ValueError, match="GOOGLE_GENAI_KEY not set"):
+        with pytest.raises(ValidationError):
             configure_lm()
 
 

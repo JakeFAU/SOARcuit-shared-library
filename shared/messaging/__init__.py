@@ -10,6 +10,7 @@ from shared.messaging.parser import parse_pubsub_payload
 from shared.messaging.pubsub import (
     build_outbound_observation,
     get_pubsub_client,
+    publish_memes,
     publish_observations,
 )
 from shared.messaging.schemas import RawObservation
@@ -26,5 +27,6 @@ __all__ = [
     "get_pubsub_client",
     "normalize_inbound_payload",
     "parse_pubsub_payload",
+    "publish_memes",
     "publish_observations",
 ]
