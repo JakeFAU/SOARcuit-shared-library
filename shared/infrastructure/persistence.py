@@ -74,7 +74,7 @@ async def get_database_password(config: DatabaseSettings) -> str:
     if config.auth_mode == DatabaseAuthMode.PASSWORD:
         if not config.password:
             raise ValueError("Password is required for PASSWORD auth mode")
-        return config.password
+        return config.password.get_secret_value()
     return await _TOKEN_CACHE.get_token()
 
 
@@ -85,6 +85,73 @@ async def init_connection(conn: Connection, enable_pgvector: bool = True) -> Non
 
     # Set search path or other session variables if needed
     await conn.execute("SET TIME ZONE 'UTC';")
+
+
+class DatabasePoolManager:
+    """Coordinates lazy creation and shutdown of a shared asyncpg pool."""
+
+    def __init__(self) -> None:
+        self._pool: Pool | None = None
+        self._lock = asyncio.Lock()
+
+    async def get_pool(self, config: DatabaseSettings) -> Pool:
+        if self._pool is not None:
+            return self._pool
+        async with self._lock:
+            if self._pool is None:
+                self._pool = await create_db_pool(config)
+        return self._pool
+
+    async def close(self) -> None:
+        async with self._lock:
+            if self._pool is not None:
+                logger.info("postgres_pool_closing")
+                await self._pool.close()
+                self._pool = None
+                logger.info("postgres_pool_closed")
+
+
+database_pool_manager = DatabasePoolManager()
+
+
+@asynccontextmanager
+async def acquire_connection(
+    db: Pool | Connection | None = None,
+    *,
+    config: DatabaseSettings | None = None,
+) -> AsyncIterator[Connection]:
+    """Acquire a connection from the pool or use the provided one."""
+    if db is None:
+        if config is None:
+            raise ValueError("Either db or config must be provided")
+        db = await database_pool_manager.get_pool(config)
+
+    if isinstance(db, Pool):
+        async with db.acquire() as conn:
+            yield cast(Connection, conn)
+        return
+    yield db
+
+
+@asynccontextmanager
+async def transaction(
+    db: Pool | Connection | None = None,
+    *,
+    config: DatabaseSettings | None = None,
+) -> AsyncIterator[Connection]:
+    """Execute a block within a database transaction."""
+    if db is None:
+        if config is None:
+            raise ValueError("Either db or config must be provided")
+        db = await database_pool_manager.get_pool(config)
+
+    if isinstance(db, Pool):
+        async with db.acquire() as conn:
+            async with conn.transaction():
+                yield cast(Connection, conn)
+        return
+    async with db.transaction():
+        yield db
 
 
 async def create_db_pool(config: DatabaseSettings) -> Pool:
@@ -112,6 +179,12 @@ async def create_db_pool(config: DatabaseSettings) -> Pool:
         raise RuntimeError("Failed to create database pool")
 
     return pool
+
+
+async def ping_pool(pool: Pool) -> None:
+    """Verify the pool is functional by executing a simple query."""
+    async with pool.acquire() as conn:
+        await conn.execute("SELECT 1")
 
 
 @asynccontextmanager
