@@ -30,14 +30,14 @@ async def wikipedia_search_fn(input_data: WikipediaInput) -> WikipediaOutput:
     async with httpx.AsyncClient(timeout=10.0) as client:
         # 1. Search for the best matching title
         search_url = "https://en.wikipedia.org/w/api.php"
-        params = {
+        params_wiki: dict[str, str | int] = {
             "action": "query",
             "list": "search",
             "srsearch": input_data.query,
             "format": "json",
             "srlimit": 1,
         }
-        search_resp = await client.get(search_url, params=params)
+        search_resp = await client.get(search_url, params=params_wiki)
         search_resp.raise_for_status()
         search_data = search_resp.json()
 
@@ -80,13 +80,13 @@ async def duckduckgo_instant_answer_fn(input_data: DuckDuckGoInput) -> DuckDuckG
     """
     async with httpx.AsyncClient(timeout=10.0) as client:
         url = "https://api.duckduckgo.com/"
-        params = {
+        params_ddg: dict[str, str | int] = {
             "q": input_data.query,
             "format": "json",
             "no_html": 1,
             "skip_disambig": 1,
         }
-        resp = await client.get(url, params=params)
+        resp = await client.get(url, params=params_ddg)
         resp.raise_for_status()
         data = resp.json()
 

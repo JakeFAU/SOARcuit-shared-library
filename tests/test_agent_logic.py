@@ -1,11 +1,9 @@
 from __future__ import annotations
 
-from typing import Any
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 from pydantic import BaseModel
-
 from shared.llm.agent import Agent
 from shared.llm.tools.base import BaseTool
 from shared.llm.types import AgentIntent, ChatMessage, Role, ToolRequest

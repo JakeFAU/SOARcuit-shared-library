@@ -1,6 +1,5 @@
 import asyncio
 import time
-from typing import Any
 
 import pytest
 from pydantic import BaseModel, Field
@@ -92,9 +91,7 @@ async def test_dispatcher_empty_requests(dispatcher: ToolDispatcher) -> None:
 
 
 @pytest.mark.anyio
-async def test_dispatcher_mixed_results(
-    dispatcher: ToolDispatcher, mock_tool: BaseTool
-) -> None:
+async def test_dispatcher_mixed_results(dispatcher: ToolDispatcher, mock_tool: BaseTool) -> None:
     """Verify handling of mixed success and failure."""
     requests = [
         ToolRequest(tool_name="sleep_tool", arguments={"seconds": 0.1}),

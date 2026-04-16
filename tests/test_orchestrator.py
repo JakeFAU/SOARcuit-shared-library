@@ -1,6 +1,6 @@
-import pytest
 from unittest.mock import AsyncMock, MagicMock
 
+import pytest
 from shared.llm.agent import Agent
 from shared.llm.dispatcher import ToolDispatcher
 from shared.llm.orchestrator import SessionOrchestrator
@@ -66,7 +66,9 @@ async def test_orchestrator_max_iterations():
 
     final_answer = await orchestrator.run("Hello")
 
-    assert final_answer == "I'm sorry, I reached the limit of my reasoning capacity for this request."
+    assert (
+        final_answer == "I'm sorry, I reached the limit of my reasoning capacity for this request."
+    )
     assert agent.decide.call_count == 3
 
 
@@ -93,6 +95,8 @@ async def test_orchestrator_no_actions_or_final_answer():
 
     # The loop breaks, and it falls through to the "failed_max_iterations" return
     # because it didn't return a final_answer within the loop.
-    assert final_answer == "I'm sorry, I reached the limit of my reasoning capacity for this request."
+    assert (
+        final_answer == "I'm sorry, I reached the limit of my reasoning capacity for this request."
+    )
     assert agent.decide.call_count == 1
     assert dispatcher.execute.call_count == 0

@@ -1,17 +1,13 @@
-from shared.llm.types import ToolRequest, AgentIntent, ToolResult, TokenUsage
-from pydantic import ValidationError
+from shared.llm.types import AgentIntent, TokenUsage, ToolRequest, ToolResult
 
-def test_models():
+
+def test_models() -> None:
     # Test ToolRequest
     tr = ToolRequest(tool_name="test_tool", arguments={"a": 1})
     print(f"ToolRequest: {tr}")
 
     # Test AgentIntent
-    intent = AgentIntent(
-        thought="thinking",
-        plan="planning",
-        actions=[tr]
-    )
+    intent = AgentIntent(thought="thinking", plan="planning", actions=[tr], final_answer=None)
     print(f"AgentIntent: {intent}")
 
     # Test ToolResult
@@ -20,9 +16,10 @@ def test_models():
         success=True,
         output="ok",
         latency_ms=10.5,
-        token_usage=TokenUsage(prompt_tokens=10, completion_tokens=5, total_tokens=15)
+        token_usage=TokenUsage(prompt_tokens=10, completion_tokens=5, total_tokens=15),
     )
     print(f"ToolResult: {res}")
+
 
 if __name__ == "__main__":
     try:
