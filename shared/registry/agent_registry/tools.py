@@ -29,7 +29,7 @@ async def wikipedia_search(
         A list of page matches with title, page id, snippet, and canonical URL.
     """
     api_url = f"https://{language}.wikipedia.org/w/api.php"
-    params = {
+    params: dict[str, str | int] = {
         "action": "query",
         "list": "search",
         "srsearch": query,

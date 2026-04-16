@@ -75,7 +75,7 @@ class LLMModel:
             )
 
         return cls(
-            provider=LLMProvider(provider),
+            provider=LLMProvider(str(provider)),
             model_id=str(model_id),
             model_name=data.get("model_name") if isinstance(data.get("model_name"), str) else None,  # type: ignore
             input_token_cost=_as_float(data.get("input_token_cost")),
@@ -112,9 +112,7 @@ class LLMModel:
         _ensure_anthropic_compatibility()
         from pydantic_ai.models.anthropic import AnthropicModel
 
-        return AnthropicModel(
-            self.model_id, provider=AnthropicProvider(api_key=api_key)
-        )
+        return AnthropicModel(self.model_id, provider=AnthropicProvider(api_key=api_key))
 
 
 @dataclass(slots=True)
@@ -157,21 +155,15 @@ class ModelRegistry:
 
     def register_alias(self, alias: str, model_id: str) -> None:
         if model_id not in self._models:
-            raise RegistryError(
-                f"Cannot register alias '{alias}' for unknown model '{model_id}'."
-            )
+            raise RegistryError(f"Cannot register alias '{alias}' for unknown model '{model_id}'.")
 
         existing = self._aliases.get(alias)
         if existing is not None and existing != model_id:
-            raise RegistryError(
-                f"Alias '{alias}' is already registered for model '{existing}'."
-            )
+            raise RegistryError(f"Alias '{alias}' is already registered for model '{existing}'.")
 
         self._aliases[alias] = model_id
 
-    def register_default(
-        self, provider: LLMProvider, tier: ModelTier, model: LLMModel
-    ) -> None:
+    def register_default(self, provider: LLMProvider, tier: ModelTier, model: LLMModel) -> None:
         self.register(model)
         self._defaults.setdefault(provider, {})[tier] = model.model_id
         self.register_alias(f"{provider.value}:{tier.value}", model.model_id)
@@ -180,30 +172,22 @@ class ModelRegistry:
         if self.llm_settings.gemini_enabled:
             for model in GOOGLE_MODELS:
                 self.register(model)
-            self.register_default(
-                LLMProvider.GOOGLE, ModelTier.HIGH_END, GEMINI_HIGH_END
-            )
+            self.register_default(LLMProvider.GOOGLE, ModelTier.HIGH_END, GEMINI_HIGH_END)
             self.register_default(LLMProvider.GOOGLE, ModelTier.NORMAL, GEMINI_NORMAL)
             self.register_default(LLMProvider.GOOGLE, ModelTier.FAST, GEMINI_FAST)
 
         if self.llm_settings.open_ai_enabled:
             for model in OPENAI_MODELS:
                 self.register(model)
-            self.register_default(
-                LLMProvider.OPENAI, ModelTier.HIGH_END, OPENAI_HIGH_END
-            )
+            self.register_default(LLMProvider.OPENAI, ModelTier.HIGH_END, OPENAI_HIGH_END)
             self.register_default(LLMProvider.OPENAI, ModelTier.NORMAL, OPENAI_NORMAL)
             self.register_default(LLMProvider.OPENAI, ModelTier.FAST, OPENAI_FAST)
 
         if self.llm_settings.anthropic_enabled:
             for model in ANTHROPIC_MODELS:
                 self.register(model)
-            self.register_default(
-                LLMProvider.ANTHROPIC, ModelTier.HIGH_END, ANTHROPIC_HIGH_END
-            )
-            self.register_default(
-                LLMProvider.ANTHROPIC, ModelTier.NORMAL, ANTHROPIC_NORMAL
-            )
+            self.register_default(LLMProvider.ANTHROPIC, ModelTier.HIGH_END, ANTHROPIC_HIGH_END)
+            self.register_default(LLMProvider.ANTHROPIC, ModelTier.NORMAL, ANTHROPIC_NORMAL)
             self.register_default(LLMProvider.ANTHROPIC, ModelTier.FAST, ANTHROPIC_FAST)
 
     def first_enabled_provider(self) -> LLMProvider | None:
@@ -212,10 +196,7 @@ class ModelRegistry:
                 return provider
             if provider == LLMProvider.OPENAI and self.llm_settings.open_ai_enabled:
                 return provider
-            if (
-                provider == LLMProvider.ANTHROPIC
-                and self.llm_settings.anthropic_enabled
-            ):
+            if provider == LLMProvider.ANTHROPIC and self.llm_settings.anthropic_enabled:
                 return provider
         return None
 
@@ -250,9 +231,7 @@ class ModelRegistry:
                 providers.append(provider)
         return tuple(providers)
 
-    def list_models(
-        self, *, provider: LLMProvider | None = None
-    ) -> tuple[LLMModel, ...]:
+    def list_models(self, *, provider: LLMProvider | None = None) -> tuple[LLMModel, ...]:
         models = tuple(self._models.values())
         if provider is None:
             return models
