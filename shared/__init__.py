@@ -15,6 +15,13 @@ from shared.domain import (
     initialize_tracing,
     utc_now,
 )
+from shared.logging import (
+    LogFormat,
+    bind_log_context,
+    clear_log_context,
+    configure_logging,
+    get_logger,
+)
 from shared.messaging import (
     PayloadDecodeError,
     RawObservation,
@@ -41,12 +48,17 @@ __all__ = [
     "UnsupportedMessageTypeError",
     "UnsupportedPayloadShapeError",
     "ValidationError",
+    "LogFormat",
+    "bind_log_context",
     "build_outbound_observation",
     "clean_observations",
+    "clear_log_context",
+    "configure_logging",
     "configure_lm",
     "decode_pubsub_message",
     "detect_message_kind",
     "expand_inbound_payloads",
+    "get_logger",
     "get_pubsub_client",
     "initialize_logger",
     "initialize_tracing",

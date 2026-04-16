@@ -1,13 +1,26 @@
 """Consolidated inference helpers for DSPy-based analysts."""
 
+import sys
+import types
 from typing import Any
 
-import dspy
 from structlog import get_logger
 
 from shared.domain.config import SOARcuitBaseSettings
 
 logger = get_logger(__name__)
+
+try:
+    import dspy
+except ModuleNotFoundError:
+    dspy = types.ModuleType("dspy")
+
+    def _missing_dspy(*args: Any, **kwargs: Any) -> Any:
+        raise ModuleNotFoundError("dspy is not installed.")
+
+    dspy.LM = _missing_dspy  # type: ignore[attr-defined]
+    dspy.configure = _missing_dspy  # type: ignore[attr-defined]
+    sys.modules.setdefault("dspy", dspy)
 
 # Global cache for cold-start optimization
 _lm_initialized = False
