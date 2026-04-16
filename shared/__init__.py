@@ -15,7 +15,7 @@ from shared.domain import (
     initialize_tracing,
     utc_now,
 )
-from shared.logging import (
+from shared.infrastructure.logging import (
     LogFormat,
     bind_log_context,
     clear_log_context,

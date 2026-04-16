@@ -1,310 +1,274 @@
-from datetime import timedelta
-from enum import StrEnum
-from typing import Final
+from __future__ import annotations
 
-import structlog
-from pydantic import (
-    AliasChoices,
-    Field,
-    SecretStr,
-    model_validator,
-)
+from enum import StrEnum
+from typing import Final, Literal
+
+from pydantic import BaseModel, Field, SecretStr, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-logger = structlog.get_logger(__name__)
-
 DEFAULT_CLOUD_SQL_INSTANCE: Final[str] = "soarcuit:us-east4:soarcuit-dev-us-east4-postgres"
-IAM_SCOPE: Final[str] = "https://www.googleapis.com/auth/cloud-platform"
-IAM_REFRESH_SKEW: Final[timedelta] = timedelta(minutes=5)
 DEFAULT_DB_CONNECT_TIMEOUT_SECONDS: Final[int] = 30
 DEFAULT_DB_MIN_POOL_SIZE: Final[int] = 1
+DEFAULT_GCP_REGION: Final[str] = "us-east4"
 
 
-class ConfigurationError(Exception):
-    """Raised when the configuration / settings are invalid."""
-
-    def __init__(self, message: str, section: str | None = None) -> None:
-        self.message = message
-        self.section = section
-        super().__init__(f"{section + ': ' if section else ''}{message}")
+class ConfigurationError(ValueError):
+    """Raised when configuration is invalid or incomplete."""
 
 
 class DatabaseAuthMode(StrEnum):
-    """Authentication methods supported by the database pool."""
-
     PASSWORD = "password"
     IAM = "iam"
 
 
 class DatabaseConnectionMode(StrEnum):
-    """Transport modes supported by the database pool."""
-
     UNIX_SOCKET = "unix_socket"
     TCP = "tcp"
 
 
-class DatabaseSettings(BaseSettings):
-    model_config = SettingsConfigDict(
-        env_file=".env",
-        extra="ignore",
-        populate_by_name=True,
-        case_sensitive=True,
-    )
+class LLMProvider(StrEnum):
+    GEMINI = "gemini"
+    OPENAI = "openai"
+    ANTHROPIC = "anthropic"
 
-    database: str = Field(
-        default="postgres",
-        validation_alias=AliasChoices("DB_NAME", "SOAR_DB_NAME", "SOARCUIT_DB_NAME"),
-    )
 
-    user: str | None = Field(
+class DatabaseSettings(BaseModel):
+    """Database configuration for Cloud SQL / Postgres."""
+
+    database: str = Field(description="Name of the database to connect to.")
+    user: str = Field(description="Username to connect to the database.")
+
+    password: SecretStr | None = Field(
         default=None,
-        validation_alias=AliasChoices(
-            "DB_USER",
-            "DATABASE_USER",
-            "SOAR_DB_USER",
-            "SOARCUIT_DB_USER",
-        ),
+        description="Password for database auth when using PASSWORD mode.",
     )
 
-    password: str | None = Field(
-        default=None,
-        validation_alias=AliasChoices(
-            "DB_PASSWORD",
-            "DATABASE_PASSWORD",
-            "SOAR_DB_PASSWORD",
-            "SOARCUIT_DB_PASSWORD",
-        ),
-    )
     auth_mode: DatabaseAuthMode | None = Field(
         default=None,
-        validation_alias=AliasChoices(
-            "DB_AUTH_MODE",
-            "SOAR_DB_AUTH_MODE",
-            "SOARCUIT_DB_AUTH_MODE",
-        ),
+        description="Authentication mode. If omitted, inferred from password presence.",
     )
     connection_mode: DatabaseConnectionMode | None = Field(
         default=None,
-        validation_alias=AliasChoices(
-            "DB_CONNECTION_MODE",
-            "SOAR_DB_CONNECTION_MODE",
-            "SOARCUIT_DB_CONNECTION_MODE",
-        ),
+        description="Connection mode. If omitted, inferred from host presence.",
     )
+
     host: str | None = Field(
         default=None,
-        validation_alias=AliasChoices("DB_HOST", "SOAR_DB_HOST", "SOARCUIT_DB_HOST"),
+        description="Database host when using TCP mode.",
     )
     port: int = Field(
         default=5432,
-        validation_alias=AliasChoices(
-            "DB_PORT",
-            "SOAR_DB_PORT",
-            "SOARCUIT_DB_PORT",
-        ),
+        gt=0,
+        lt=65536,
+        description="Database port when using TCP mode.",
     )
+
     cloud_sql_instance: str = Field(
         default=DEFAULT_CLOUD_SQL_INSTANCE,
-        validation_alias=AliasChoices(
-            "DB_CLOUD_SQL_INSTANCE",
-            "SOAR_DB_CLOUD_SQL_INSTANCE",
-            "SOARCUIT_DB_CLOUD_SQL_INSTANCE",
-        ),
+        min_length=1,
+        description="Cloud SQL instance connection name.",
     )
     unix_socket_dir: str = Field(
         default="/cloudsql",
-        validation_alias=AliasChoices(
-            "DB_UNIX_SOCKET_DIR",
-            "SOAR_DB_UNIX_SOCKET_DIR",
-            "SOARCUIT_DB_UNIX_SOCKET_DIR",
-        ),
+        min_length=1,
+        description="Directory under which the Cloud SQL Unix socket is mounted.",
     )
+
     min_pool_size: int = Field(
         default=DEFAULT_DB_MIN_POOL_SIZE,
-        validation_alias=AliasChoices(
-            "DB_POOL_MIN_SIZE",
-            "SOAR_DB_POOL_MIN_SIZE",
-            "SOARCUIT_DB_POOL_MIN_SIZE",
-        ),
+        ge=1,
+        description="Minimum number of connections to keep in the pool.",
     )
     max_pool_size: int = Field(
         default=10,
-        validation_alias=AliasChoices(
-            "DB_POOL_MAX_SIZE",
-            "SOAR_DB_POOL_MAX_SIZE",
-            "SOARCUIT_DB_POOL_MAX_SIZE",
-        ),
+        ge=1,
+        description="Maximum number of connections to keep in the pool.",
     )
+
     connect_timeout: int = Field(
         default=DEFAULT_DB_CONNECT_TIMEOUT_SECONDS,
-        validation_alias=AliasChoices(
-            "DB_CONNECT_TIMEOUT_SECONDS",
-            "SOAR_DB_CONNECT_TIMEOUT_SECONDS",
-            "SOARCUIT_DB_CONNECT_TIMEOUT_SECONDS",
-        ),
+        gt=0,
+        description="Seconds to wait when establishing a database connection.",
     )
     command_timeout: float = Field(
         default=30.0,
-        validation_alias=AliasChoices(
-            "DB_COMMAND_TIMEOUT_SECONDS",
-            "SOAR_DB_COMMAND_TIMEOUT_SECONDS",
-            "SOARCUIT_DB_COMMAND_TIMEOUT_SECONDS",
-        ),
+        gt=0,
+        description="Seconds to wait for a query / command to complete.",
     )
+
     statement_cache_size: int = Field(
         default=100,
-        validation_alias=AliasChoices(
-            "DB_STATEMENT_CACHE_SIZE",
-            "SOAR_DB_STATEMENT_CACHE_SIZE",
-            "SOARCUIT_DB_STATEMENT_CACHE_SIZE",
-        ),
+        ge=0,
+        description="Number of prepared statements to cache.",
     )
     max_queries: int = Field(
         default=50_000,
-        validation_alias=AliasChoices(
-            "DB_MAX_QUERIES",
-            "SOAR_DB_POOL_MAX_QUERIES",
-            "SOARCUIT_DB_POOL_MAX_QUERIES",
-        ),
+        ge=0,
+        description="Maximum queries before recycling a pooled connection.",
     )
-    max_inactive_connection_lifetime: float = Field(
-        default=300.0,
-        validation_alias=AliasChoices(
-            "DB_MAX_INACTIVE_LIFETIME",
-            "SOAR_DB_POOL_MAX_INACTIVE_LIFETIME",
-            "SOARCUIT_DB_POOL_MAX_INACTIVE_LIFETIME",
-        ),
+    max_inactive_connection_lifetime: int = Field(
+        default=300,
+        ge=0,
+        description="Maximum idle lifetime, in seconds, for pooled connections.",
     )
+
     enable_pgvector: bool = Field(
         default=True,
-        validation_alias=AliasChoices(
-            "DB_ENABLE_PGVECTOR",
-            "SOAR_DB_ENABLE_PGVECTOR",
-            "SOARCUIT_DB_ENABLE_PGVECTOR",
-        ),
+        description="Whether pgvector-dependent features are enabled.",
     )
 
     @model_validator(mode="after")
     def validate_settings(self) -> DatabaseSettings:
-        """Makes Sure the DatabaseSettings are valid after the model has been initialized."""
+        if self.min_pool_size > self.max_pool_size:
+            raise ValueError("min_pool_size must be <= max_pool_size")
 
-        # make sure the user is set
-        if not self.user:
-            raise ConfigurationError("Database user must be set", section="DatabaseSettings")
+        if self.resolved_auth_mode == DatabaseAuthMode.PASSWORD and self.password is None:
+            raise ValueError("password must be set when auth_mode is PASSWORD")
 
-        # Resolve auth_mode
-        if self.auth_mode is None:
-            self.auth_mode = DatabaseAuthMode.PASSWORD if self.password else DatabaseAuthMode.IAM
+        if self.resolved_connection_mode == DatabaseConnectionMode.TCP and not self.host:
+            raise ValueError("host must be set when connection_mode is TCP")
 
-        # Resolve connection_mode
-        if self.connection_mode is None:
-            self.connection_mode = (
-                DatabaseConnectionMode.TCP if self.host else DatabaseConnectionMode.UNIX_SOCKET
-            )
-
-        # Resolve host for UNIX socket if not provided
-        if self.host is None:
-            if self.connection_mode == DatabaseConnectionMode.TCP:
-                self.host = "127.0.0.1"
-            else:
-                unix_socket_dir = self.unix_socket_dir
-                cloud_sql_instance = self.cloud_sql_instance
-                self.host = f"{unix_socket_dir.rstrip('/')}/{cloud_sql_instance}"
         return self
 
+    @property
+    def resolved_auth_mode(self) -> DatabaseAuthMode:
+        return self.auth_mode or (
+            DatabaseAuthMode.PASSWORD if self.password is not None else DatabaseAuthMode.IAM
+        )
 
-class LLMSettings(BaseSettings):
-    """Settings for the LLM configuration."""
+    @property
+    def resolved_connection_mode(self) -> DatabaseConnectionMode:
+        return self.connection_mode or (
+            DatabaseConnectionMode.TCP if self.host else DatabaseConnectionMode.UNIX_SOCKET
+        )
 
-    model_config = SettingsConfigDict(
-        env_file=".env",
-        extra="ignore",
-        populate_by_name=True,
-        case_sensitive=True,
+    @property
+    def resolved_host(self) -> str:
+        if self.resolved_connection_mode == DatabaseConnectionMode.TCP:
+            if not self.host:
+                raise ConfigurationError("host is required to resolve a TCP database connection")
+            return self.host
+
+        return f"{self.unix_socket_dir.rstrip('/')}/{self.cloud_sql_instance}"
+
+
+class LLMSettings(BaseModel):
+    """Configuration for model providers and embeddings."""
+
+    gemini_api_key: SecretStr = Field(
+        description="Required Gemini API key. Gemini is used for embeddings.",
     )
-
-    gemini_api_key: SecretStr | None = Field(
+    openai_api_key: SecretStr | None = Field(
         default=None,
-        validation_alias=AliasChoices(
-            "GEMINI_API_KEY",
-            "SOAR_GEMINI_API_KEY",
-            "SOARCUIT_GEMINI_API_KEY",
-        ),
+        description="Optional OpenAI API key.",
     )
-
-    open_ai_api_key: SecretStr | None = Field(
-        default=None,
-        validation_alias=AliasChoices(
-            "OPEN_AI_API_KEY",
-            "SOAR_OPEN_AI_API_KEY",
-            "SOARCUIT_OPEN_AI_API_KEY",
-        ),
-    )
-
     anthropic_api_key: SecretStr | None = Field(
         default=None,
-        validation_alias=AliasChoices(
-            "ANTHROPIC_API_KEY",
-            "SOAR_ANTHROPIC_API_KEY",
-            "SOARCUIT_ANTHROPIC_API_KEY",
-        ),
+        description="Optional Anthropic API key.",
+    )
+
+    default_provider: LLMProvider = Field(
+        default=LLMProvider.GEMINI,
+        description="Default provider to use for general LLM calls.",
+    )
+
+    default_gemini_model: str = Field(
+        default="gemini-3-flash-preview",
+        min_length=1,
+        description="Default Gemini model for chat / generation.",
+    )
+    default_openai_model: str = Field(
+        default="gpt-5-mini",
+        min_length=1,
+        description="Default OpenAI model for chat / generation.",
+    )
+    default_anthropic_model: str = Field(
+        default="claude-3-5-haiku-latest",
+        min_length=1,
+        description="Default Anthropic model for chat / generation.",
+    )
+
+    embedding_provider: Literal["gemini"] = Field(
+        default="gemini",
+        description="Embedding provider. Fixed to Gemini in this application.",
+    )
+    embedding_model: str = Field(
+        default="gemini-embedding-2-preview",
+        min_length=1,
+        description="Embedding model name.",
+    )
+    embedding_dimension: int = Field(
+        default=768,
+        gt=0,
+        description="Expected embedding vector dimension.",
     )
 
     @model_validator(mode="after")
     def validate_settings(self) -> LLMSettings:
-        """Validates the LLM settings after the model has been initialized."""
-        if not self.gemini_api_key and not self.open_ai_api_key and not self.anthropic_api_key:
-            raise ConfigurationError(
-                "At least one LLM API key must be set (Gemini / OpenAI / Anthropic).",
-                section="LLMSettings",
+        if self.default_provider == LLMProvider.OPENAI and self.openai_api_key is None:
+            raise ValueError("default_provider is OPENAI but openai_api_key is not configured")
+
+        if self.default_provider == LLMProvider.ANTHROPIC and self.anthropic_api_key is None:
+            raise ValueError(
+                "default_provider is ANTHROPIC but anthropic_api_key is not configured"
             )
+
         return self
 
     @property
     def gemini_enabled(self) -> bool:
-        """Returns True if the Gemini API key is configured / enabled."""
         return self.gemini_api_key is not None
 
     @property
-    def open_ai_enabled(self) -> bool:
-        """Returns True if the OpenAI API key is configured / enabled."""
-        return self.open_ai_api_key is not None
+    def openai_enabled(self) -> bool:
+        return self.openai_api_key is not None
 
     @property
     def anthropic_enabled(self) -> bool:
-        """Returns True if the Anthropic API key is configured / enabled."""
         return self.anthropic_api_key is not None
+
+    @property
+    def default_model(self) -> str:
+        match self.default_provider:
+            case LLMProvider.GEMINI:
+                return self.default_gemini_model
+            case LLMProvider.OPENAI:
+                return self.default_openai_model
+            case LLMProvider.ANTHROPIC:
+                return self.default_anthropic_model
+
+        raise ConfigurationError(f"Unsupported default provider: {self.default_provider!r}")
+
+
+class GCPSettings(BaseModel):
+    """Google Cloud Platform configuration."""
+
+    project_id: str = Field(
+        min_length=1,
+        description="Google Cloud project ID.",
+    )
+    project_name: str = Field(
+        min_length=1,
+        description="Human-readable project name.",
+    )
+    default_region: str = Field(
+        default=DEFAULT_GCP_REGION,
+        min_length=1,
+        description="Default GCP region.",
+    )
 
 
 class AppSettings(BaseSettings):
-    """Settings for the Application"""
+    """Top-level application settings."""
 
-    database_settings: DatabaseSettings = Field(
-        default_factory=DatabaseSettings,
-        validation_alias=AliasChoices(
-            "DATABASE_SETTINGS",
-            "SOAR_DATABASE_SETTINGS",
-            "SOARCUIT_DATABASE_SETTINGS",
-        ),
+    model_config = SettingsConfigDict(
+        env_prefix="SOAR_",
+        env_nested_delimiter="__",
+        env_file=".env",
+        extra="ignore",
+        case_sensitive=False,
     )
 
-    llm_settings: LLMSettings = Field(
-        default_factory=LLMSettings,
-        validation_alias=AliasChoices(
-            "LLM_SETTINGS",
-            "SOAR_LLM_SETTINGS",
-            "SOARCUIT_LLM_SETTINGS",
-        ),
-    )
-
-    @model_validator(mode="after")
-    def validate_settings(self) -> AppSettings:
-        """Validates the AppSettings after the model has been initialized."""
-        # errors should have already been raised, but just in case
-        if not self.database_settings or not self.llm_settings:
-            raise ConfigurationError(
-                "AppSettings must have both database_settings and llm_settings configured / initialized",
-                section="AppSettings",
-            )
-
-        return self
+    database_settings: DatabaseSettings
+    llm_settings: LLMSettings
+    gcp_settings: GCPSettings

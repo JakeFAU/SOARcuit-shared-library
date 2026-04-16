@@ -6,7 +6,7 @@ from typing import Any
 from cloudevents.http import CloudEvent
 from opentelemetry import trace
 
-from shared.logging import get_logger
+from shared.infrastructure.logging import get_logger
 
 # Pre-configured global tracer and logger instances
 # Note: In Cloud Functions, you might want to call get_logger(analyst_name)

@@ -5,7 +5,7 @@ import sys
 
 import structlog
 from shared.domain.tracing import initialize_logger
-from shared.logging import (
+from shared.infrastructure.logging import (
     LogFormat,
     bind_log_context,
     clear_log_context,
