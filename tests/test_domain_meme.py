@@ -1,9 +1,10 @@
-import pytest
-from datetime import datetime, UTC, timedelta
 from uuid import UUID, uuid4
-from shared.domain.meme import RawObservation, Meme, EMBEDDING_DIMS
-from shared.domain.enums import MemeStatus, MemeTruthState, ObservationKind
+
+import pytest
+from shared.domain.enums import MemeStatus, ObservationKind
+from shared.domain.meme import EMBEDDING_DIMS, Meme, RawObservation
 from shared.errors import ValidationError
+
 
 @pytest.fixture
 def valid_raw_observation_data():

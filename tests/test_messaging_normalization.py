@@ -1,12 +1,12 @@
-import pytest
 from shared.messaging.normalization import (
-    normalize_inbound_payload,
     expand_inbound_payloads,
     extract_explicit_kind,
-    has_raw_shape,
     has_meme_shape,
+    has_raw_shape,
+    normalize_inbound_payload,
     unsupported_shape_message,
 )
+
 
 def test_has_raw_shape():
     valid_raw = {

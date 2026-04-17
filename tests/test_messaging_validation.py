@@ -1,10 +1,11 @@
 import pytest
-from shared.messaging.validation import detect_message_kind
 from shared.domain.enums import MessageKind
 from shared.messaging.errors import (
     UnsupportedMessageTypeError,
     UnsupportedPayloadShapeError,
 )
+from shared.messaging.validation import detect_message_kind
+
 
 def test_detect_message_kind_raw():
     payload = {

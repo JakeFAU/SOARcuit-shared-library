@@ -1,10 +1,17 @@
-import pytest
 from unittest.mock import MagicMock, patch
-from opentelemetry.trace import Span, Status, StatusCode, SpanKind
+
+import pytest
+from opentelemetry.trace import Span, StatusCode
 from shared.observability.tracer import (
-    get_tracer, get_meter, concrete_attributes, set_span_attributes,
-    mark_span_ok, mark_span_error, traced_span
+    concrete_attributes,
+    get_meter,
+    get_tracer,
+    mark_span_error,
+    mark_span_ok,
+    set_span_attributes,
+    traced_span,
 )
+
 
 def test_get_tracer():
     tracer = get_tracer("test")

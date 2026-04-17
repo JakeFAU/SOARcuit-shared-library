@@ -1,13 +1,14 @@
+from unittest.mock import Mock, patch
+
 import pytest
-import json
-from unittest.mock import MagicMock, patch, Mock
+from shared.domain.meme import EMBEDDING_DIMS, Meme
 from shared.messaging.pubsub import (
-    get_pubsub_client,
     build_outbound_observation,
+    get_pubsub_client,
     publish_memes,
-    publish_observations
+    publish_observations,
 )
-from shared.domain.meme import Meme, EMBEDDING_DIMS
+
 
 @pytest.fixture
 def mock_pubsub_client():

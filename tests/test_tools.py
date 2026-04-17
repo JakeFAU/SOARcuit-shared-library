@@ -1,17 +1,21 @@
-import pytest
-import math
+
 import httpx
+import pytest
 from pydantic import BaseModel, Field
-from unittest.mock import AsyncMock, MagicMock
 from shared.llm.tools.base import (
-    BaseTool, ToolExecutionResult, ToolInputError, ToolOutputError,
-    ToolConfigurationError, ToolExecutionError
+    BaseTool,
+    ToolConfigurationError,
+    ToolExecutionError,
+    ToolInputError,
+    ToolOutputError,
 )
 from shared.llm.tools.standard import (
-    WikipediaInput, WikipediaOutput, wikipedia_search_fn,
-    DuckDuckGoInput, DuckDuckGoOutput, duckduckgo_instant_answer_fn,
-    WIKIPEDIA_TOOL, DUCKDUCKGO_TOOL
+    DuckDuckGoInput,
+    WikipediaInput,
+    duckduckgo_instant_answer_fn,
+    wikipedia_search_fn,
 )
+
 
 class MockInput(BaseModel):
     query: str

@@ -1,9 +1,12 @@
+from unittest.mock import AsyncMock, patch
+
 import pytest
-from unittest.mock import AsyncMock, MagicMock, patch
-from shared.llm.client import ChatService
-from shared.llm.types import ChatMessage, ChatResponse, TokenUsage, Role
-from shared.config.config import LLMSettings, LLMProvider as ProviderType
 from pydantic import BaseModel, SecretStr
+from shared.config.config import LLMProvider as ProviderType
+from shared.config.config import LLMSettings
+from shared.llm.client import ChatService
+from shared.llm.types import ChatMessage, ChatResponse, Role, TokenUsage
+
 
 class MockResponseModel(BaseModel):
     answer: str

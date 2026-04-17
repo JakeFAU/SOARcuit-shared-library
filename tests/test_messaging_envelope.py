@@ -1,11 +1,13 @@
-import pytest
-import json
 import base64
+import json
+
+import pytest
 from shared.messaging.envelope import (
     decode_pubsub_message_data,
     unwrap_pubsub_envelope,
 )
 from shared.messaging.errors import PayloadDecodeError
+
 
 def test_decode_pubsub_message_data_json():
     data = json.dumps({"key": "value"}).encode("utf-8")

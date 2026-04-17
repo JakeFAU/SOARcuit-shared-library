@@ -1,11 +1,13 @@
+from unittest.mock import AsyncMock, MagicMock
+
 import pytest
-from unittest.mock import AsyncMock, MagicMock, patch
-from shared.llm.providers.openai import OpenAIProvider
+from pydantic import BaseModel, SecretStr
+from shared.config.config import LLMSettings
 from shared.llm.providers.anthropic import AnthropicProvider
 from shared.llm.providers.gemini import GeminiProvider
+from shared.llm.providers.openai import OpenAIProvider
 from shared.llm.types import ChatMessage, Role
-from shared.config.config import LLMSettings
-from pydantic import BaseModel, SecretStr
+
 
 class MockResponseModel(BaseModel):
     answer: str

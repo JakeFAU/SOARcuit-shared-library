@@ -1,8 +1,11 @@
+from unittest.mock import AsyncMock, MagicMock, patch
+
 import pytest
-from unittest.mock import MagicMock, patch, AsyncMock
-from shared.agents.basic import FastOpenAIAgent, ResearchOpenAIAgent
-from shared.config.config import AppSettings, LLMSettings, LLMProvider as ProviderType, ModelNames
 from pydantic import SecretStr
+from shared.agents.basic import FastOpenAIAgent, ResearchOpenAIAgent
+from shared.config.config import AppSettings, LLMSettings, ModelNames
+from shared.config.config import LLMProvider as ProviderType
+
 
 @pytest.fixture
 def app_settings():
@@ -41,7 +44,7 @@ def test_research_openai_agent_init(app_settings):
 @pytest.mark.anyio
 async def test_agent_decide_integration(app_settings):
     # This tests the base Agent.decide using one of the basic agents
-    from shared.llm.types import ChatMessage, Role, AgentIntent, ToolRequest
+    from shared.llm.types import AgentIntent, ChatMessage, Role
     
     with patch("shared.agents.basic.ChatService") as mock_chat_service_cls:
         mock_service = MagicMock()

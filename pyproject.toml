@@ -88,9 +88,10 @@ pythonpath = ["."]
 testpaths = ["tests"]
 
 [tool.ruff]
+exclude = ["tests"]
 target-version = "py314"
 line-length = 100
-src = ["shared", "tests"]
+src = ["shared"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "B", "UP"]

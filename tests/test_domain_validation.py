@@ -1,13 +1,21 @@
-import pytest
-from datetime import datetime, UTC
-from uuid import UUID, uuid4
+from datetime import UTC, datetime
 from enum import StrEnum
+from uuid import uuid4
+
+import pytest
 from shared.domain.validation import (
-    require_text, require_float, require_int, require_uuid, 
-    require_datetime, require_enum, require_mapping, require_tags,
-    require_embedding
+    require_datetime,
+    require_embedding,
+    require_enum,
+    require_float,
+    require_int,
+    require_mapping,
+    require_tags,
+    require_text,
+    require_uuid,
 )
 from shared.errors import ValidationError
+
 
 class ExampleEnum(StrEnum):
     A = "a"
