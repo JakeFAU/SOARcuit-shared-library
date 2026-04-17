@@ -12,11 +12,9 @@ logger = get_logger(__name__)
 
 @runtime_checkable
 class InstrumentationRepository(Protocol):
-    async def record_action_run(self, run: ActionRun) -> None:
-        ...
+    async def record_action_run(self, run: ActionRun) -> None: ...
 
-    async def record_step_measurement(self, measurement: ActionStepMeasurement) -> None:
-        ...
+    async def record_step_measurement(self, measurement: ActionStepMeasurement) -> None: ...
 
 
 class NoOpInstrumentationRepository:

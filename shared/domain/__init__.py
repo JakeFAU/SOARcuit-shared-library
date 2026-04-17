@@ -3,12 +3,12 @@
 from typing import Any
 
 from shared.domain.enums import (
+    VOI_COMPONENT_NAMES,
     ActionTopic,
     MemeStatus,
     MemeTruthState,
     MessageKind,
     ObservationKind,
-    VOI_COMPONENT_NAMES,
 )
 from shared.domain.identifiers import utc_now
 from shared.domain.meme import EMBEDDING_DIMS, Meme, RawObservation
