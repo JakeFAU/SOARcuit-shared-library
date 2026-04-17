@@ -260,6 +260,33 @@ class GCPSettings(BaseModel):
     )
 
 
+class ExternalToolSettings(BaseModel):
+    """Configuration for external tools and APIs."""
+
+    tavily_api_key: SecretStr | None = Field(
+        default=None,
+        description="API key for Tavily search.",
+    )
+    github_token: SecretStr | None = Field(
+        default=None,
+        description="Personal access token for GitHub API.",
+    )
+    slack_webhook_url: SecretStr | None = Field(
+        default=None,
+        description="Webhook URL for Slack notifications.",
+    )
+    discord_webhook_url: SecretStr | None = Field(
+        default=None,
+        description="Webhook URL for Discord notifications.",
+    )
+    arxiv_max_results: int = Field(
+        default=5,
+        ge=1,
+        le=50,
+        description="Maximum results for arXiv searches.",
+    )
+
+
 class ProviderModels(BaseModel, ABC):
     thinking_model: str
     default_model: str
@@ -323,6 +350,7 @@ class AppSettings(BaseSettings):
     llm_settings: LLMSettings
     gcp_settings: GCPSettings
     model_names: ModelNames
+    external_tools: ExternalToolSettings = Field(default_factory=ExternalToolSettings)
 
 
 @lru_cache(maxsize=1)
