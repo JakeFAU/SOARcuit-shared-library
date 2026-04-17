@@ -19,6 +19,13 @@ from .lifecycle import ActionRunManager
 from .models import ActionRun, ActionStatus, ActionStepMeasurement
 from .naming import CanonicalName, InvalidCanonicalNameError
 from .profiler import Profiler, measure_step
+from .repository import (
+    InstrumentationRepository,
+    ListInstrumentationRepository,
+    LoggingInstrumentationRepository,
+    MemeAwareInstrumentationRepository,
+    NoOpInstrumentationRepository,
+)
 
 __all__ = [
     "ActionRunManager",
@@ -27,6 +34,11 @@ __all__ = [
     "ActionStepMeasurement",
     "CanonicalName",
     "InvalidCanonicalNameError",
+    "InstrumentationRepository",
+    "ListInstrumentationRepository",
+    "LoggingInstrumentationRepository",
+    "MemeAwareInstrumentationRepository",
+    "NoOpInstrumentationRepository",
     "Profiler",
     "measure_step",
 ]

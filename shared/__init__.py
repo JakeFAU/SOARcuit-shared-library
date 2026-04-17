@@ -14,6 +14,7 @@ Key Packages:
 - shared.messaging: Pub/Sub normalization and envelope handling.
 """
 
+from .infrastructure.logging import configure_logging
 from .llm import (
     ARXIV_TOOL,
     DUCKDUCKGO_TOOL,
@@ -52,4 +53,5 @@ __all__ = [
     "TokenUsage",
     "ToolRequest",
     "ToolResult",
+    "configure_logging",
 ]

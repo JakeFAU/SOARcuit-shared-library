@@ -27,6 +27,10 @@ class CanonicalName:
     verb: str
     variant: str | None = None
 
+    @property
+    def operation(self) -> str:
+        return self.verb
+
     @classmethod
     def parse(cls, name: str) -> CanonicalName:
         """
