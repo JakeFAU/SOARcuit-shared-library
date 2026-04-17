@@ -1,7 +1,11 @@
+from __future__ import annotations
+
 from enum import StrEnum
 from typing import Any, TypeVar
 
 from pydantic import BaseModel, Field
+
+from shared.instrumentation.models import ActionStepMeasurement
 
 T = TypeVar("T", bound=BaseModel)
 
@@ -32,9 +36,12 @@ class TokenUsage(BaseModel):
 class ChatResponse(BaseModel):
     """Unified response from any LLM provider."""
 
+    model_config = {"arbitrary_types_allowed": True}
+
     content: str
     usage: TokenUsage = Field(default_factory=TokenUsage)
     model: str
+    measurement: ActionStepMeasurement | None = None
 
 
 class ToolRequest(BaseModel):
@@ -68,3 +75,8 @@ class ToolResult(BaseModel):
     error: str | None = None
     latency_ms: float = 0.0
     token_usage: TokenUsage = Field(default_factory=TokenUsage)
+    measurement: ActionStepMeasurement | None = None
+
+
+ChatResponse.model_rebuild()
+ToolResult.model_rebuild()

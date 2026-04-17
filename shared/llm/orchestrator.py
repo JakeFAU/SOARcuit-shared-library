@@ -13,8 +13,26 @@ tracer = get_tracer("orchestrator")
 
 class SessionOrchestrator:
     """
-    Stateful manager for the reasoning loop.
-    Coordinates between the Agent (Thinker) and ToolDispatcher (Actor).
+    Stateful Lifecycle Manager (The 'Heart').
+
+    The Orchestrator drives the iterative reasoning loop by coordinating between
+    the Agent (Thinker) and the ToolDispatcher (Actor). It maintains the
+    conversation history and enforces execution constraints.
+
+    Workflow:
+    1. Initialize history with the user's input.
+    2. Loop (up to max_iterations):
+       a. Ask the Agent for an Intent (Thought + Plan + Actions).
+       b. Append the Assistant's reasoning to the history.
+       c. If Intent contains a Final Answer, return it and exit.
+       d. Pass the requested Actions to the ToolDispatcher.
+       e. Capture the Results and append them to the history as Observations.
+    3. Return a failure message if the iteration limit is reached.
+
+    Args:
+        agent: The stateless Agent instance providing reasoning logic.
+        dispatcher: The ToolDispatcher instance providing execution mechanics.
+        max_iterations: Maximum number of Thought-Action-Observation cycles permitted.
     """
 
     def __init__(self, agent: Agent, dispatcher: ToolDispatcher, max_iterations: int = 5):
@@ -24,8 +42,11 @@ class SessionOrchestrator:
 
     async def run(self, user_input: str) -> str:
         """
-        Drives the reasoning loop until a final answer is found or max turns reached.
-        Uses OpenTelemetry to trace the entire session and each reasoning cycle.
+        Executes the full reasoning loop for a given user query.
+
+        This method is the primary entry point for agentic execution. It is fully
+        instrumented with OpenTelemetry spans, capturing every cycle and tool
+        execution for downstream performance and cost analysis.
         """
         with tracer.start_as_current_span(f"orchestrator.{self.agent.name}.run") as span:
             span.set_attribute("agent.name", self.agent.name)
@@ -72,13 +93,13 @@ class SessionOrchestrator:
                         logger.warning("agent_stopped_no_intent", iteration=i)
                         break
 
-                    # 2. Execute via Actor
+                    # 2. Execute via Actor (ToolDispatcher)
                     cycle_span.add_event(
                         "tool_execution_started", {"tool_count": len(intent.actions)}
                     )
                     results = await self.dispatcher.execute(intent.actions)
 
-                    # 3. Format observations
+                    # 3. Format observations and inject back into history
                     obs_lines = []
                     success_count = 0
                     for res in results:

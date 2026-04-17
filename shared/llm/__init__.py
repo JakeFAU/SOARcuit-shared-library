@@ -1,3 +1,18 @@
+"""
+Unified Agent Framework.
+
+This package implements the 'Thinking vs. Acting' architectural pattern.
+
+- 'Thinking' is handled by the stateless Agent class, which uses Abstract Planning
+  to decompose goals into structured intents.
+- 'Acting' is handled by the ToolDispatcher, which manages concurrent execution,
+  telemetry, and error normalization.
+- The lifecycle is orchestrated by the SessionOrchestrator.
+
+This separation ensures that reasoning logic is pure and highly testable, while
+execution mechanics are robust and observable.
+"""
+
 from .agent import Agent
 from .client import ChatService
 from .dispatcher import ToolDispatcher
