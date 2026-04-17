@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "soarcuit-shared"
-version = "0.6.0"
+version = "0.6.1"
 description = "Shared canonical models and message parsing for SOARcuit services"
 readme = "README.md"
 requires-python = ">=3.14"
@@ -16,7 +16,7 @@ dependencies = [
     "marshmallow>=4.3.0",
     "opentelemetry-api>=1.41.0",
     "opentelemetry-sdk>=1.41.0",
-    "pydantic>=2.13.1",
+    "pydantic>=2.13.2",
     "pydantic-settings>=2.13.1",
     "pyyaml>=6.0.3",
     "structlog>=25.5.0",

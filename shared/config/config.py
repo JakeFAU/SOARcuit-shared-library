@@ -1,3 +1,18 @@
+"""
+SOARcuit Configuration Management.
+
+This module defines the central configuration schema for the SOARcuit ecosystem
+using Pydantic Settings. It manages environment-specific variables, model hierarchies,
+and external tool credentials with strict validation and type safety.
+
+The configuration is hierarchical:
+- AppSettings: The top-level entry point.
+- LLMSettings: Provider keys and default model selections.
+- GCPSettings: Project-level identity for Google Cloud.
+- ModelNames: Tiered model aliases (quick, default, thinking) for dynamic dispatch.
+- ExternalToolSettings: API keys and constraints for non-LLM services.
+"""
+
 from __future__ import annotations
 
 from abc import ABC
@@ -19,23 +34,35 @@ class ConfigurationError(ValueError):
 
 
 class DatabaseAuthMode(StrEnum):
+    """Supported authentication methods for Postgres."""
+
     PASSWORD = "password"
     IAM = "iam"
 
 
 class DatabaseConnectionMode(StrEnum):
+    """Supported network topologies for Postgres."""
+
     UNIX_SOCKET = "unix_socket"
     TCP = "tcp"
 
 
 class LLMProvider(StrEnum):
+    """Supported LLM vendors."""
+
     GEMINI = "gemini"
     OPENAI = "openai"
     ANTHROPIC = "anthropic"
 
 
 class DatabaseSettings(BaseModel):
-    """Database configuration for Cloud SQL / Postgres."""
+    """
+    Postgres / Cloud SQL Connection Configuration.
+
+    Handles both local TCP connections and production-grade Cloud SQL Proxy
+    Unix sockets. Includes logic for inferring auth and connection modes
+    based on provided fields.
+    """
 
     database: str = Field(description="Name of the database to connect to.")
     user: str = Field(description="Username to connect to the database.")
@@ -121,6 +148,7 @@ class DatabaseSettings(BaseModel):
 
     @model_validator(mode="after")
     def validate_settings(self) -> DatabaseSettings:
+        """Cross-field validation for consistent connection modes."""
         if self.min_pool_size > self.max_pool_size:
             raise ValueError("min_pool_size must be <= max_pool_size")
 
@@ -134,18 +162,21 @@ class DatabaseSettings(BaseModel):
 
     @property
     def resolved_auth_mode(self) -> DatabaseAuthMode:
+        """Infers the auth mode from password presence if not explicit."""
         return self.auth_mode or (
             DatabaseAuthMode.PASSWORD if self.password is not None else DatabaseAuthMode.IAM
         )
 
     @property
     def resolved_connection_mode(self) -> DatabaseConnectionMode:
+        """Infers connection mode from host presence if not explicit."""
         return self.connection_mode or (
             DatabaseConnectionMode.TCP if self.host else DatabaseConnectionMode.UNIX_SOCKET
         )
 
     @property
     def resolved_host(self) -> str:
+        """Resolves the connection string target based on mode."""
         if self.resolved_connection_mode == DatabaseConnectionMode.TCP:
             if not self.host:
                 raise ConfigurationError("host is required to resolve a TCP database connection")
@@ -155,7 +186,13 @@ class DatabaseSettings(BaseModel):
 
 
 class LLMSettings(BaseModel):
-    """Configuration for model providers and embeddings."""
+    """
+    Global LLM Provider and Embedding Configuration.
+
+    Defines the source of truth for vendor API keys and fallback model
+    selections. Also configures the canonical embedding model used for
+    vector operations.
+    """
 
     gemini_api_key: SecretStr = Field(
         description="Required Gemini API key. Gemini is used for embeddings.",
@@ -207,6 +244,7 @@ class LLMSettings(BaseModel):
 
     @model_validator(mode="after")
     def validate_settings(self) -> LLMSettings:
+        """Ensures API keys are present for the selected default provider."""
         if self.default_provider == LLMProvider.OPENAI and self.openai_api_key is None:
             raise ValueError("default_provider is OPENAI but openai_api_key is not configured")
 
@@ -219,18 +257,22 @@ class LLMSettings(BaseModel):
 
     @property
     def gemini_enabled(self) -> bool:
+        """Check if Gemini credentials are available."""
         return self.gemini_api_key is not None
 
     @property
     def openai_enabled(self) -> bool:
+        """Check if OpenAI credentials are available."""
         return self.openai_api_key is not None
 
     @property
     def anthropic_enabled(self) -> bool:
+        """Check if Anthropic credentials are available."""
         return self.anthropic_api_key is not None
 
     @property
     def default_model(self) -> str:
+        """Resolves the default model name for the selected provider."""
         match self.default_provider:
             case LLMProvider.GEMINI:
                 return self.default_gemini_model
@@ -243,7 +285,7 @@ class LLMSettings(BaseModel):
 
 
 class GCPSettings(BaseModel):
-    """Google Cloud Platform configuration."""
+    """Google Cloud Platform Project Identity."""
 
     project_id: str = Field(
         min_length=1,
@@ -261,7 +303,7 @@ class GCPSettings(BaseModel):
 
 
 class ExternalToolSettings(BaseModel):
-    """Configuration for external tools and APIs."""
+    """Credentials and Constraints for Third-Party Services."""
 
     tavily_api_key: SecretStr | None = Field(
         default=None,
@@ -288,18 +330,24 @@ class ExternalToolSettings(BaseModel):
 
 
 class ProviderModels(BaseModel, ABC):
+    """Abstract interface for tiered model assignments per provider."""
+
     thinking_model: str
     default_model: str
     quick_model: str
 
 
 class OpenAIModels(ProviderModels):
+    """Tiered assignments for OpenAI models."""
+
     thinking_model: str = Field(default="gpt-5.4", description="Thinking model for OpenAI.")
     default_model: str = Field(default="gpt-5", description="Default model for OpenAI.")
     quick_model: str = Field(default="gpt-5-mini", description="Quick model for OpenAI.")
 
 
 class GeminiModels(ProviderModels):
+    """Tiered assignments for Gemini models (Primary Stack)."""
+
     thinking_model: str = Field(
         default="gemini-3.1-pro-preview", description="Thinking model for Gemini."
     )
@@ -312,6 +360,8 @@ class GeminiModels(ProviderModels):
 
 
 class AnthropicModels(ProviderModels):
+    """Tiered assignments for Anthropic models."""
+
     thinking_model: str = Field(
         default="claude-opus-4-7", description="Thinking model for Anthropic."
     )
@@ -322,6 +372,13 @@ class AnthropicModels(ProviderModels):
 
 
 class ModelNames(BaseModel):
+    """
+    Central Registry of Model Hierarchies.
+
+    Allows agents to request a tier (e.g., 'quick') rather than a specific
+    version, enabling easy system-wide model upgrades.
+    """
+
     model_config = SettingsConfigDict(
         env_prefix="SOAR_MODELS_",
         env_nested_delimiter="__",
@@ -336,7 +393,12 @@ class ModelNames(BaseModel):
 
 
 class AppSettings(BaseSettings):
-    """Top-level application settings."""
+    """
+    SOARcuit Unified Application Configuration.
+
+    The root configuration object, typically loaded from environment variables
+    prefixed with 'SOAR_'.
+    """
 
     model_config = SettingsConfigDict(
         env_prefix="SOAR_",
@@ -355,4 +417,10 @@ class AppSettings(BaseSettings):
 
 @lru_cache(maxsize=1)
 def get_settings() -> AppSettings:
+    """
+    Returns a cached instance of the application settings.
+
+    This is the primary way for components to access configuration,
+    ensuring consistent state across the library.
+    """
     return AppSettings()  # type: ignore[call-arg]

@@ -1,3 +1,20 @@
+"""
+SOARcuit Tool Abstraction Layer.
+
+This module defines the foundational `BaseTool` class, which provides a production-grade
+interface for LLM-callable functions. It enforces strict input/output contracts
+using Pydantic models and provides first-class support for observability,
+cost estimation, and template rendering.
+
+Key Features:
+- Contract Enforcement: Validates LLM-provided arguments against a Pydantic schema.
+- Automatic Instruction Generation: Introspects the input model to generate
+  technically precise tool definitions for the LLM.
+- Detailed Telemetry: Instruments every execution step with OpenTelemetry spans.
+- Result Normalization: Automatically converts raw function returns into
+  validated Pydantic models or JSON strings.
+"""
+
 from __future__ import annotations
 
 import inspect
@@ -23,52 +40,63 @@ PLACEHOLDER_PATTERN = re.compile(r"\{(\w+)\}")
 
 
 class ToolException(Exception):
-    """Base exception for tool-related errors."""
+    """Base exception for all tool-related errors in the SOARcuit ecosystem."""
 
 
 class ToolConfigurationError(ToolException):
-    """Raised when a tool is configured incorrectly."""
+    """Raised when a tool is instantiated with invalid parameters or signatures."""
 
 
 class ToolExecutionError(ToolException):
-    """Raised when a tool fails during execution."""
+    """Raised when the underlying tool function fails during execution."""
 
 
 class ToolInputError(ToolException):
-    """Raised when tool input is invalid."""
+    """Raised when the LLM-provided arguments fail validation against the input model."""
 
 
 class ToolOutputError(ToolException):
-    """Raised when tool output is invalid."""
+    """Raised when the tool's return value fails validation against the output model."""
 
 
 class ToolExecutionResult(BaseModel):
-    """Normalized execution metadata for observability and downstream routing."""
+    """
+    Normalized metadata for a tool execution episode.
+
+    Used for orchestration, logging, and downstream routing where the full
+    telemetry of the tool call is required.
+    """
 
     model_config = ConfigDict(extra="forbid")
 
-    tool_name: str
-    success: bool
-    raw_output: Any | None = None
-    structured_output: BaseModel | None = None
-    error: str | None = None
-    estimated_cost: float | None = None
-    estimated_risk: float | None = None
+    tool_name: str = Field(..., description="The unique identifier of the tool.")
+    success: bool = Field(..., description="Whether the execution completed without error.")
+    raw_output: Any | None = Field(None, description="The unparsed result of the tool function.")
+    structured_output: BaseModel | None = Field(
+        None, description="The Pydantic-validated output model."
+    )
+    error: str | None = Field(None, description="Error message if success is False.")
+    estimated_cost: float | None = Field(None, description="Direct dollar cost of the operation.")
+    estimated_risk: float | None = Field(None, description="Calculated operational risk score.")
 
 
 class BaseTool(BaseModel):
     """
-    Production-oriented tool abstraction.
+    Production-oriented Tool Abstraction.
 
-    Principles:
-    - Input and output contracts are explicit.
-    - Tool function receives validated input.
-    - Tool function may return:
-        1) output_model instance
-        2) dict compatible with output_model
-        3) JSON string compatible with output_model
-        4) raw string / Any if no output_model is configured
-    - Observability is first-class.
+    BaseTool wraps an async function with a strict Pydantic-defined contract.
+    It ensures that the LLM only interacts with the tool via its validated
+    schema and that every call is observable and costed.
+
+    Args:
+        name: Unique tool identifier.
+        description: Human-readable description for the LLM.
+        function: The async callable that performs the actual work.
+        input_model: The Pydantic model defining the expected arguments.
+        output_model: Optional Pydantic model for the validated result.
+        input_text: Optional template for rendering text-based inputs.
+        cost_estimate: Optional callable to estimate execution cost.
+        risk_estimate: Optional callable to estimate operational risk.
     """
 
     model_config = ConfigDict(
@@ -111,23 +139,23 @@ class BaseTool(BaseModel):
     _replacements_cache: set[str] = PrivateAttr(default_factory=set)
 
     def model_post_init(self, __context: Any) -> None:
-        """Validate tool configuration once at construction time."""
+        """Performs static validation of the tool configuration at startup."""
         self._validate_function_signature()
         self._validate_template_placeholders()
 
     @property
     def replacements(self) -> set[str]:
-        """Return placeholder names found in input_text."""
+        """Returns the set of placeholder keys found in the input_text template."""
         return set(self._replacements_cache)
 
     def render_input_text(self, validated_input: BaseModel) -> str | None:
-        """Render input_text with validated model fields if a template is configured."""
+        """Interpolates placeholders in input_text using validated model fields."""
         if not self.input_text:
             return None
         return self.input_text.format(**validated_input.model_dump())
 
     def estimate_cost(self, validated_input: BaseModel) -> float | None:
-        """Safely compute cost estimate if configured."""
+        """Calculates the estimated cost for the specific input provided."""
         if self.cost_estimate is None:
             return None
         try:
@@ -138,7 +166,7 @@ class BaseTool(BaseModel):
             ) from exc
 
     def estimate_risk(self, validated_input: BaseModel) -> float | None:
-        """Safely compute risk estimate if configured."""
+        """Calculates the operational risk for the specific input provided."""
         if self.risk_estimate is None:
             return None
         try:
@@ -148,11 +176,40 @@ class BaseTool(BaseModel):
                 f"Risk estimator failed for tool '{self.name}': {exc}"
             ) from exc
 
+    def to_instruction(self) -> str:
+        """
+        Generates a technically precise instruction block for the LLM.
+
+        Introspects the input_model and its field descriptions to provide the
+        LLM with a clear understanding of the tool's required and optional arguments.
+        """
+        schema = self.input_model.model_json_schema()
+        props = schema.get("properties", {})
+        required = schema.get("required", [])
+
+        arg_desc = []
+        for name, info in props.items():
+            req_str = " (required)" if name in required else ""
+            desc = info.get("description", "No description.")
+            arg_desc.append(f"  - {name}: {info.get('type')}{req_str}. {desc}")
+
+        args_block = "\n".join(arg_desc)
+        return f"TOOL: {self.name}\nDESCRIPTION: {self.description}\nARGUMENTS:\n{args_block}\n"
+
     async def execute(self, **kwargs: Any) -> Any:
         """
-        Execute the tool and return either:
-        - output_model instance if output_model is configured
-        - raw function result otherwise
+        Main execution entry point for the tool.
+
+        Validates inputs, captures telemetry, executes the underlying function,
+        and normalizes the output.
+
+        Returns:
+            The validated result (either the raw function return or the output_model).
+
+        Raises:
+            ToolInputError: If arguments fail validation.
+            ToolExecutionError: If the function itself fails.
+            ToolOutputError: If the result fails validation.
         """
         with tracer.start_as_current_span(f"tool.{self.name}") as span:
             span.set_attribute("tool.name", self.name)
@@ -188,8 +245,8 @@ class BaseTool(BaseModel):
 
                 return normalized_result
 
-            except ToolException as exc:
-                self._record_error(span, exc)
+            except ToolException:
+                # Re-raise known tool exceptions
                 raise
             except Exception as exc:
                 wrapped = ToolExecutionError(
@@ -200,8 +257,11 @@ class BaseTool(BaseModel):
 
     async def execute_with_metadata(self, **kwargs: Any) -> ToolExecutionResult:
         """
-        Execute the tool and always return normalized metadata.
-        Useful for orchestration, experiments, and telemetry-heavy systems.
+        Executes the tool and returns a comprehensive ToolExecutionResult.
+
+        Unlike `execute()`, this method does not raise on business-logic failures;
+        it captures them in the `success` and `error` fields of the result model.
+        Useful for orchestration where failure is a valid reasoning branch.
         """
         try:
             try:
@@ -220,6 +280,7 @@ class BaseTool(BaseModel):
                     success=True,
                     raw_output=result.model_dump(),
                     structured_output=result,
+                    error=None,
                     estimated_cost=estimated_cost,
                     estimated_risk=estimated_risk,
                 )
@@ -229,6 +290,7 @@ class BaseTool(BaseModel):
                 success=True,
                 raw_output=result,
                 structured_output=None,
+                error=None,
                 estimated_cost=estimated_cost,
                 estimated_risk=estimated_risk,
             )
@@ -253,13 +315,15 @@ class BaseTool(BaseModel):
             return ToolExecutionResult(
                 tool_name=self.name,
                 success=False,
+                raw_output=None,
+                structured_output=None,
                 error=str(exc),
                 estimated_cost=estimated_cost,
                 estimated_risk=estimated_risk,
             )
 
     def _validate_function_signature(self) -> None:
-        """Ensure function is async and has a sane callable signature."""
+        """Ensures the wrapped function is async and accepts the correct arguments."""
         if not inspect.iscoroutinefunction(self.function):
             raise ToolConfigurationError(f"Tool '{self.name}' function must be async.")
 
@@ -273,7 +337,7 @@ class BaseTool(BaseModel):
             )
 
     def _validate_template_placeholders(self) -> None:
-        """Ensure all input_text placeholders exist on the input model."""
+        """Ensures that any placeholders in input_text map to fields on the input model."""
         if not self.input_text:
             self._replacements_cache = set()
             return
@@ -289,24 +353,8 @@ class BaseTool(BaseModel):
 
         self._replacements_cache = placeholders
 
-    def to_instruction(self) -> str:
-        """Generate a clean, high-signal instruction block for the LLM."""
-        schema = self.input_model.model_json_schema()
-        # Simplify schema for the prompt
-        props = schema.get("properties", {})
-        required = schema.get("required", [])
-
-        arg_desc = []
-        for name, info in props.items():
-            req_str = " (required)" if name in required else ""
-            desc = info.get("description", "No description.")
-            arg_desc.append(f"  - {name}: {info.get('type')}{req_str}. {desc}")
-
-        args_block = "\n".join(arg_desc)
-        return f"TOOL: {self.name}\nDESCRIPTION: {self.description}\nARGUMENTS:\n{args_block}\n"
-
     def _validate_input(self, kwargs: dict[str, Any], span: Span) -> BaseModel:
-        """Validate runtime kwargs against the configured input model."""
+        """Validates raw dictionary input against the input_model schema."""
         span.add_event("tool.input.validation.started")
         try:
             validated = self.input_model.model_validate(kwargs)
@@ -316,7 +364,7 @@ class BaseTool(BaseModel):
             raise ToolInputError(f"Invalid input for tool '{self.name}': {exc}") from exc
 
     async def _execute_function(self, validated_input: BaseModel, span: Span) -> Any:
-        """Invoke the underlying tool function."""
+        """Invokes the underlying async function."""
         span.add_event("tool.function.execution.started")
         try:
             result = await self.function(validated_input)
@@ -326,7 +374,7 @@ class BaseTool(BaseModel):
             raise ToolExecutionError(f"Error executing tool '{self.name}': {exc}") from exc
 
     def _normalize_output(self, result: Any, span: Span) -> Any:
-        """Normalize and validate tool output."""
+        """Validates and normalizes the tool return value against the output_model."""
         if self.output_model is None:
             return result
 
@@ -368,7 +416,7 @@ class BaseTool(BaseModel):
             raise ToolOutputError(f"Invalid output for tool '{self.name}': {exc}") from exc
 
     def _record_error(self, span: Span, exc: Exception) -> None:
-        """Record exception details in telemetry and logs."""
+        """Instruments and logs an execution failure."""
         message = str(exc)
         span.record_exception(exc)
         span.set_status(Status(StatusCode.ERROR, message))
