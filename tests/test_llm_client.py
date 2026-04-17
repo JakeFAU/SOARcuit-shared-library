@@ -1,13 +1,27 @@
-import pytest
-from unittest.mock import AsyncMock, MagicMock, patch
-from shared.llm.client import ChatService
-from shared.llm.types import ChatMessage, ChatResponse, TokenUsage, Role
-from shared.config.config import LLMSettings, LLMProvider as ProviderType
-from pydantic import BaseModel, SecretStr
 from uuid import uuid4
+from unittest.mock import patch
+
+import pytest
+from pydantic import BaseModel, SecretStr
+
+from shared.config.config import LLMSettings, LLMProvider as ProviderType
+from shared.llm.client import ChatService
+from shared.llm.types import ChatMessage, ChatResponse, Role, TokenUsage
 
 class MockResponseModel(BaseModel):
     answer: str
+
+
+class OpenAIProvider:
+    async def chat(self, *args, **kwargs):
+        return ChatResponse(
+            content="hello",
+            usage=TokenUsage(prompt_tokens=10, completion_tokens=5, total_tokens=15),
+            model="gpt-4",
+        )
+
+    async def chat_structured(self, *args, **kwargs):
+        return MockResponseModel(answer="42")
 
 @pytest.fixture
 def llm_settings():
@@ -45,33 +59,29 @@ async def test_chat_service_resolve_provider(llm_settings):
 @pytest.mark.anyio
 async def test_chat_service_chat(llm_settings):
     service = ChatService(llm_settings)
-    mock_provider = AsyncMock()
-    mock_provider.chat.return_value = ChatResponse(
-        content="hello",
-        usage=TokenUsage(prompt_tokens=10, completion_tokens=5, total_tokens=15),
-        model="gpt-4"
-    )
-    
+    mock_provider = OpenAIProvider()
+
     decision_id = uuid4()
     run_id = uuid4()
-    
+
     with patch.object(service, "_resolve_provider", return_value=(mock_provider, "gpt-4")):
         resp = await service.chat(
             [ChatMessage(role=Role.USER, content="hi")],
             decision_id=decision_id,
-            action_run_id=run_id
+            action_run_id=run_id,
         )
         assert resp.content == "hello"
         assert resp.measurement is not None
         assert resp.measurement.total_tokens == 15
         assert resp.measurement.decision_id == decision_id
+        assert resp.measurement.step_name == "model:openai:chat"
+        assert resp.measurement.finished_at is not None
 
 @pytest.mark.anyio
 async def test_chat_service_chat_structured(llm_settings):
     service = ChatService(llm_settings)
-    mock_provider = AsyncMock()
-    mock_provider.chat_structured.return_value = MockResponseModel(answer="42")
-    
+    mock_provider = OpenAIProvider()
+
     decision_id = uuid4()
     run_id = uuid4()
 
@@ -80,8 +90,9 @@ async def test_chat_service_chat_structured(llm_settings):
             messages=[ChatMessage(role=Role.USER, content="meaning?")],
             response_model=MockResponseModel,
             decision_id=decision_id,
-            action_run_id=run_id
+            action_run_id=run_id,
         )
         assert resp.answer == "42"
-        # Since we attached it via setattr
-        assert hasattr(resp, "_measurement") or hasattr(resp, "measurement")
+        measurement = getattr(resp, "_measurement")
+        assert measurement.step_name == "model:openai:structured_output"
+        assert measurement.finished_at is not None

@@ -121,13 +121,15 @@ class ChatService:
                     step_name=step_name,
                     decision_id=decision_id,
                     action_run_id=action_run_id,
+                    provider=provider_name,
+                    model_name=model_name,
                     metadata={"model": model_name},
                 ) as profiler:
                     response = await provider.chat(messages, model=resolved_model, **kwargs)
-                    measurement = profiler.get_measurement()
-                    measurement.input_tokens = response.usage.prompt_tokens
-                    measurement.output_tokens = response.usage.completion_tokens
-                    measurement.total_tokens = response.usage.total_tokens
+                    profiler.input_tokens = response.usage.prompt_tokens
+                    profiler.output_tokens = response.usage.completion_tokens
+                    profiler.total_tokens = response.usage.total_tokens
+                measurement = profiler.get_measurement()
             else:
                 response = await provider.chat(messages, model=resolved_model, **kwargs)
 
@@ -178,12 +180,14 @@ class ChatService:
                     step_name=step_name,
                     decision_id=decision_id,
                     action_run_id=action_run_id,
+                    provider=provider_name,
+                    model_name=model_name,
                     metadata={"model": model_name, "response_model": response_model.__name__},
                 ) as profiler:
                     response = await provider.chat_structured(
                         messages, response_model=response_model, model=resolved_model, **kwargs
                     )
-                    measurement = profiler.get_measurement()
+                measurement = profiler.get_measurement()
             else:
                 response = await provider.chat_structured(
                     messages, response_model=response_model, model=resolved_model, **kwargs

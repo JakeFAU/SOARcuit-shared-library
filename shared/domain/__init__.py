@@ -2,7 +2,14 @@
 
 from typing import Any
 
-from shared.domain.enums import MemeStatus, MemeTruthState, MessageKind, ObservationKind
+from shared.domain.enums import (
+    VOI_COMPONENT_NAMES,
+    ActionTopic,
+    MemeStatus,
+    MemeTruthState,
+    MessageKind,
+    ObservationKind,
+)
 from shared.domain.identifiers import utc_now
 from shared.domain.meme import EMBEDDING_DIMS, Meme, RawObservation
 from shared.domain.tracing import decode_pubsub_message, initialize_logger, initialize_tracing
@@ -22,6 +29,7 @@ def clean_observations(*args: Any, **kwargs: Any) -> list[dict[str, Any]]:
 
 
 __all__ = [
+    "ActionTopic",
     "EMBEDDING_DIMS",
     "Meme",
     "MemeStatus",
@@ -30,6 +38,7 @@ __all__ = [
     "ObservationKind",
     "RawObservation",
     "ValidationError",
+    "VOI_COMPONENT_NAMES",
     "clean_observations",
     "configure_lm",
     "decode_pubsub_message",

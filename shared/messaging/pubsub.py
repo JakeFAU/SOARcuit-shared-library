@@ -115,6 +115,7 @@ def publish_observations(
     topic_path: str,
     analyst: str,
     timestamp: str | None = None,
+    attributes: Mapping[str, str] | None = None,
 ) -> list[str]:
     """Publish results to the downstream topic with tracing."""
     if not observations:
@@ -142,15 +143,19 @@ def publish_observations(
         client = get_pubsub_client()
         futures = []
         for index, payload in enumerate(outbound_messages):
+            publish_attributes = {
+                "analyst": analyst,
+                "observation_count": str(len(outbound_messages)),
+                "observation_index": str(index),
+                "message_type": "raw_observation",
+                "source_kind": str(payload["metadata"]["source_kind"]),
+            }
+            publish_attributes.update(dict(attributes or {}))
             futures.append(
                 client.publish(
                     topic_path,
                     json.dumps(payload).encode("utf-8"),
-                    analyst=analyst,
-                    observation_count=str(len(outbound_messages)),
-                    observation_index=str(index),
-                    message_type="raw_observation",
-                    source_kind=str(payload["metadata"]["source_kind"]),
+                    **publish_attributes,
                 )
             )
         message_ids = [future.result(timeout=10) for future in futures]

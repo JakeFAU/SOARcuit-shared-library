@@ -36,3 +36,27 @@ class MemeTruthState(StrEnum):
     SUPPORTED = "supported"
     CONTRADICTED = "contradicted"
     FALSE = "false"
+
+
+class ActionTopic(StrEnum):
+    """Downstream Pub/Sub topics representing actions selected by Thalamus.
+
+    Each topic corresponds to an 'active' component that performs specific
+    refinement or research tasks on memes.
+    """
+
+    ACTIVE_REFINE = "active-refine"
+    ACTIVE_RESEARCH = "active-research"
+    ACTIVE_RETAG = "active-retag"
+    ACTIVE_TRUTH_DETECTION = "active-truth-detection"
+    ACTIVE_NOOP = "active-noop"
+
+
+VOI_COMPONENT_NAMES = (
+    "content",
+    "depth",
+    "truth",
+    "connection",
+    "momentum",
+    "longevity",
+)

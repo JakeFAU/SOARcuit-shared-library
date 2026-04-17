@@ -27,7 +27,7 @@ from shared.domain.validation import (
 )
 from shared.errors import ValidationError
 
-EMBEDDING_DIMS = 3072
+EMBEDDING_DIMS = 768
 
 
 @dataclass(slots=True)
