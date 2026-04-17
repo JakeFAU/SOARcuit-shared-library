@@ -164,7 +164,7 @@ async def create_db_pool(config: DatabaseSettings) -> Pool:
         user=config.user,
         password=get_password,
         database=config.database,
-        host=config.host,
+        host=config.resolved_host,
         port=config.port,
         min_size=config.min_pool_size,
         max_size=config.max_pool_size,
