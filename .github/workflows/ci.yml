@@ -28,4 +28,4 @@ jobs:
         run: uv run mypy shared
 
       - name: Run tests with pytest
-        run: uv run pytest
+        run: uv run pytest --cov=shared --cov-report=term-missing --cov-fail-under=85

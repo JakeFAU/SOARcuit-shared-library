@@ -1,5 +1,8 @@
 from typing import Any
 
+from shared.infrastructure.logging import get_logger
+from shared.observability.tracer import get_tracer
+
 from ..config.config import LLMProvider as ProviderType
 from ..config.config import LLMSettings
 from .base import LLMProvider
@@ -7,6 +10,9 @@ from .providers.anthropic import AnthropicProvider
 from .providers.gemini import GeminiProvider
 from .providers.openai import OpenAIProvider
 from .types import ChatMessage, ChatResponse, T
+
+logger = get_logger("llm_client")
+tracer = get_tracer("llm_client")
 
 
 class ChatService:
@@ -64,7 +70,21 @@ class ChatService:
         Unified chat interface. Respects configuration defaults.
         """
         provider, resolved_model = self._resolve_provider(model)
-        return await provider.chat(messages, model=resolved_model, **kwargs)
+
+        with tracer.start_as_current_span("llm.chat") as span:
+            span.set_attribute("llm.model", resolved_model or "default")
+            span.set_attribute("llm.message_count", len(messages))
+
+            logger.info("llm_chat_started", model=resolved_model)
+            response = await provider.chat(messages, model=resolved_model, **kwargs)
+
+            span.set_attribute("llm.usage.prompt_tokens", response.usage.prompt_tokens)
+            span.set_attribute("llm.usage.completion_tokens", response.usage.completion_tokens)
+            logger.info(
+                "llm_chat_completed", model=response.model, tokens=response.usage.total_tokens
+            )
+
+            return response
 
     async def chat_structured(
         self,
@@ -77,6 +97,19 @@ class ChatService:
         Unified structured output interface. Respects configuration defaults.
         """
         provider, resolved_model = self._resolve_provider(model)
-        return await provider.chat_structured(
-            messages, response_model=response_model, model=resolved_model, **kwargs
-        )
+
+        with tracer.start_as_current_span("llm.chat_structured") as span:
+            span.set_attribute("llm.model", resolved_model or "default")
+            span.set_attribute("llm.response_model", response_model.__name__)
+
+            logger.info(
+                "llm_structured_chat_started",
+                model=resolved_model,
+                target_model=response_model.__name__,
+            )
+            response = await provider.chat_structured(
+                messages, response_model=response_model, model=resolved_model, **kwargs
+            )
+            logger.info("llm_structured_chat_completed")
+
+            return response
