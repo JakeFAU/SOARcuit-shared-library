@@ -1,69 +1,55 @@
-"""Shared canonical models and message parsing for SOARcuit services."""
+"""
+SOARcuit Shared Library.
 
-from shared.domain import (
-    EMBEDDING_DIMS,
-    Meme,
-    MemeStatus,
-    MemeTruthState,
-    MessageKind,
-    ObservationKind,
-    ValidationError,
-    clean_observations,
-    configure_lm,
-    decode_pubsub_message,
-    initialize_logger,
-    initialize_tracing,
-    utc_now,
-)
-from shared.infrastructure.logging import (
-    LogFormat,
-    bind_log_context,
-    clear_log_context,
-    configure_logging,
-    get_logger,
-)
-from shared.messaging import (
-    PayloadDecodeError,
-    RawObservation,
-    UnsupportedMessageTypeError,
-    UnsupportedPayloadShapeError,
-    build_outbound_observation,
-    detect_message_kind,
-    expand_inbound_payloads,
-    get_pubsub_client,
-    normalize_inbound_payload,
-    parse_pubsub_payload,
-    publish_observations,
+This library provides the foundational architecture for the SOARcuit event-driven
+LLM memory system. It enforces a strict "Thinking vs. Acting" separation for agents,
+a unified interface for multi-turn chat with structured outputs, and a comprehensive
+instrumentation layer for economic optimization (mVOI vs. MC).
+
+Key Packages:
+- shared.llm: Unified LLM client and Agent framework.
+- shared.instrumentation: High-fidelity telemetry and cost measurement.
+- shared.config: Config-driven environment management.
+- shared.domain: Canonical data models for memes and observations.
+- shared.messaging: Pub/Sub normalization and envelope handling.
+"""
+
+from .llm import (
+    ARXIV_TOOL,
+    DUCKDUCKGO_TOOL,
+    GITHUB_REPO_TOOL,
+    TAVILY_TOOL,
+    WIKIPEDIA_TOOL,
+    Agent,
+    AgentIntent,
+    BaseTool,
+    ChatMessage,
+    ChatResponse,
+    ChatService,
+    Role,
+    SessionOrchestrator,
+    TokenUsage,
+    ToolDispatcher,
+    ToolRequest,
+    ToolResult,
 )
 
 __all__ = [
-    "EMBEDDING_DIMS",
-    "Meme",
-    "MemeStatus",
-    "MemeTruthState",
-    "MessageKind",
-    "ObservationKind",
-    "PayloadDecodeError",
-    "RawObservation",
-    "UnsupportedMessageTypeError",
-    "UnsupportedPayloadShapeError",
-    "ValidationError",
-    "LogFormat",
-    "bind_log_context",
-    "build_outbound_observation",
-    "clean_observations",
-    "clear_log_context",
-    "configure_logging",
-    "configure_lm",
-    "decode_pubsub_message",
-    "detect_message_kind",
-    "expand_inbound_payloads",
-    "get_logger",
-    "get_pubsub_client",
-    "initialize_logger",
-    "initialize_tracing",
-    "normalize_inbound_payload",
-    "parse_pubsub_payload",
-    "publish_observations",
-    "utc_now",
+    "Agent",
+    "AgentIntent",
+    "ChatService",
+    "SessionOrchestrator",
+    "ToolDispatcher",
+    "BaseTool",
+    "WIKIPEDIA_TOOL",
+    "DUCKDUCKGO_TOOL",
+    "TAVILY_TOOL",
+    "ARXIV_TOOL",
+    "GITHUB_REPO_TOOL",
+    "ChatMessage",
+    "ChatResponse",
+    "Role",
+    "TokenUsage",
+    "ToolRequest",
+    "ToolResult",
 ]

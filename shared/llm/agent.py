@@ -19,8 +19,27 @@ T = TypeVar("T", bound=BaseModel)
 
 class Agent:
     """
-    Production-grade Agent implementation with Abstract Planning.
-    Dynamically builds instructions from Tool definitions.
+    Stateless Reasoning Engine (The 'Thinker').
+
+    The Agent is responsible for decomposing a high-level user goal into an
+    abstract plan and a sequence of tool requests. It operates as a pure function
+    of (History, ToolContracts) -> Intent.
+
+    Design Principles:
+    1. Statelessness: The Agent does not maintain conversation history internally;
+       it is passed the full history at every decision point.
+    2. Abstract Planning: Every decision step forces the LLM to provide a 'thought'
+       and a 'plan' before requesting actions, ensuring strategic alignment.
+    3. Dynamic Discovery: Tools are described to the LLM using their
+       `to_instruction()` method, ensuring zero-config tool integration.
+
+    Args:
+        name: Unique identifier for the agent (used in telemetry).
+        base_instructions: The persona and primary directive of the agent.
+        llm_service: The ChatService used for model interactions.
+        tools: List of BaseTool instances the agent is authorized to use.
+        max_iterations: Safety guard to prevent infinite reasoning loops.
+        model: Specific model override (e.g., 'gemini-3.1-pro-preview').
     """
 
     def __init__(
@@ -40,7 +59,12 @@ class Agent:
         self.model = model
 
     def _build_system_prompt(self) -> str:
-        """Constructs the system prompt using abstract planning and tool instructions."""
+        """
+        Dynamically assembles the system prompt.
+
+        Includes the base persona, the operational protocol (Analyze -> Plan -> Request -> Converge),
+        and the auto-generated tool contracts from the provided toolset.
+        """
         tool_instructions = "\n".join(t.to_instruction() for t in self.tools.values())
 
         return (
@@ -59,7 +83,12 @@ class Agent:
         )
 
     async def decide(self, history: list[ChatMessage]) -> AgentIntent:
-        """Asks the LLM for the next step (Thought -> Plan -> Actions/FinalAnswer)."""
+        """
+        Invokes the LLM to determine the next reasoning step.
+
+        Takes the current conversation history and returns an AgentIntent containing
+        the internal thought process, the revised plan, and any requested actions.
+        """
         system_msg = ChatMessage(role=Role.SYSTEM, content=self._build_system_prompt())
         messages = [system_msg] + history
         return await self.llm_service.chat_structured(
