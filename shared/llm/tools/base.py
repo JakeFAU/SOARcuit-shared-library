@@ -1,17 +1,17 @@
 """
 SOARcuit Tool Abstraction Layer.
 
-This module defines the foundational `BaseTool` class, which provides a production-grade 
-interface for LLM-callable functions. It enforces strict input/output contracts 
-using Pydantic models and provides first-class support for observability, 
+This module defines the foundational `BaseTool` class, which provides a production-grade
+interface for LLM-callable functions. It enforces strict input/output contracts
+using Pydantic models and provides first-class support for observability,
 cost estimation, and template rendering.
 
 Key Features:
 - Contract Enforcement: Validates LLM-provided arguments against a Pydantic schema.
-- Automatic Instruction Generation: Introspects the input model to generate 
+- Automatic Instruction Generation: Introspects the input model to generate
   technically precise tool definitions for the LLM.
 - Detailed Telemetry: Instruments every execution step with OpenTelemetry spans.
-- Result Normalization: Automatically converts raw function returns into 
+- Result Normalization: Automatically converts raw function returns into
   validated Pydantic models or JSON strings.
 """
 
@@ -62,8 +62,8 @@ class ToolOutputError(ToolException):
 class ToolExecutionResult(BaseModel):
     """
     Normalized metadata for a tool execution episode.
-    
-    Used for orchestration, logging, and downstream routing where the full 
+
+    Used for orchestration, logging, and downstream routing where the full
     telemetry of the tool call is required.
     """
 
@@ -84,8 +84,8 @@ class BaseTool(BaseModel):
     """
     Production-oriented Tool Abstraction.
 
-    BaseTool wraps an async function with a strict Pydantic-defined contract. 
-    It ensures that the LLM only interacts with the tool via its validated 
+    BaseTool wraps an async function with a strict Pydantic-defined contract.
+    It ensures that the LLM only interacts with the tool via its validated
     schema and that every call is observable and costed.
 
     Args:
@@ -179,8 +179,8 @@ class BaseTool(BaseModel):
     def to_instruction(self) -> str:
         """
         Generates a technically precise instruction block for the LLM.
-        
-        Introspects the input_model and its field descriptions to provide the 
+
+        Introspects the input_model and its field descriptions to provide the
         LLM with a clear understanding of the tool's required and optional arguments.
         """
         schema = self.input_model.model_json_schema()
@@ -194,22 +194,18 @@ class BaseTool(BaseModel):
             arg_desc.append(f"  - {name}: {info.get('type')}{req_str}. {desc}")
 
         args_block = "\n".join(arg_desc)
-        return (
-            f"TOOL: {self.name}\n"
-            f"DESCRIPTION: {self.description}\n"
-            f"ARGUMENTS:\n{args_block}\n"
-        )
+        return f"TOOL: {self.name}\nDESCRIPTION: {self.description}\nARGUMENTS:\n{args_block}\n"
 
     async def execute(self, **kwargs: Any) -> Any:
         """
         Main execution entry point for the tool.
 
-        Validates inputs, captures telemetry, executes the underlying function, 
+        Validates inputs, captures telemetry, executes the underlying function,
         and normalizes the output.
-        
+
         Returns:
             The validated result (either the raw function return or the output_model).
-        
+
         Raises:
             ToolInputError: If arguments fail validation.
             ToolExecutionError: If the function itself fails.
@@ -253,7 +249,9 @@ class BaseTool(BaseModel):
                 # Re-raise known tool exceptions
                 raise
             except Exception as exc:
-                wrapped = ToolExecutionError(f"Unexpected error executing tool '{self.name}': {exc}")
+                wrapped = ToolExecutionError(
+                    f"Unexpected error executing tool '{self.name}': {exc}"
+                )
                 self._record_error(span, wrapped)
                 raise wrapped from exc
 
@@ -261,7 +259,7 @@ class BaseTool(BaseModel):
         """
         Executes the tool and returns a comprehensive ToolExecutionResult.
 
-        Unlike `execute()`, this method does not raise on business-logic failures; 
+        Unlike `execute()`, this method does not raise on business-logic failures;
         it captures them in the `success` and `error` fields of the result model.
         Useful for orchestration where failure is a valid reasoning branch.
         """
@@ -282,6 +280,7 @@ class BaseTool(BaseModel):
                     success=True,
                     raw_output=result.model_dump(),
                     structured_output=result,
+                    error=None,
                     estimated_cost=estimated_cost,
                     estimated_risk=estimated_risk,
                 )
@@ -291,6 +290,7 @@ class BaseTool(BaseModel):
                 success=True,
                 raw_output=result,
                 structured_output=None,
+                error=None,
                 estimated_cost=estimated_cost,
                 estimated_risk=estimated_risk,
             )
@@ -315,6 +315,8 @@ class BaseTool(BaseModel):
             return ToolExecutionResult(
                 tool_name=self.name,
                 success=False,
+                raw_output=None,
+                structured_output=None,
                 error=str(exc),
                 estimated_cost=estimated_cost,
                 estimated_risk=estimated_risk,
@@ -346,8 +348,7 @@ class BaseTool(BaseModel):
 
         if missing:
             raise ToolConfigurationError(
-                f"Tool '{self.name}' input_text references unknown placeholders: "
-                f"{sorted(missing)}"
+                f"Tool '{self.name}' input_text references unknown placeholders: {sorted(missing)}"
             )
 
         self._replacements_cache = placeholders

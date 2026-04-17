@@ -1,8 +1,8 @@
 """
 SOARcuit Configuration Management.
 
-This module defines the central configuration schema for the SOARcuit ecosystem 
-using Pydantic Settings. It manages environment-specific variables, model hierarchies, 
+This module defines the central configuration schema for the SOARcuit ecosystem
+using Pydantic Settings. It manages environment-specific variables, model hierarchies,
 and external tool credentials with strict validation and type safety.
 
 The configuration is hierarchical:
@@ -59,8 +59,8 @@ class DatabaseSettings(BaseModel):
     """
     Postgres / Cloud SQL Connection Configuration.
 
-    Handles both local TCP connections and production-grade Cloud SQL Proxy 
-    Unix sockets. Includes logic for inferring auth and connection modes 
+    Handles both local TCP connections and production-grade Cloud SQL Proxy
+    Unix sockets. Includes logic for inferring auth and connection modes
     based on provided fields.
     """
 
@@ -189,8 +189,8 @@ class LLMSettings(BaseModel):
     """
     Global LLM Provider and Embedding Configuration.
 
-    Defines the source of truth for vendor API keys and fallback model 
-    selections. Also configures the canonical embedding model used for 
+    Defines the source of truth for vendor API keys and fallback model
+    selections. Also configures the canonical embedding model used for
     vector operations.
     """
 
@@ -303,7 +303,7 @@ class GCPSettings(BaseModel):
 
 
 class ExternalToolSettings(BaseModel):
-    """ Credentials and Constraints for Third-Party Services."""
+    """Credentials and Constraints for Third-Party Services."""
 
     tavily_api_key: SecretStr | None = Field(
         default=None,
@@ -375,7 +375,7 @@ class ModelNames(BaseModel):
     """
     Central Registry of Model Hierarchies.
 
-    Allows agents to request a tier (e.g., 'quick') rather than a specific 
+    Allows agents to request a tier (e.g., 'quick') rather than a specific
     version, enabling easy system-wide model upgrades.
     """
 
@@ -396,7 +396,7 @@ class AppSettings(BaseSettings):
     """
     SOARcuit Unified Application Configuration.
 
-    The root configuration object, typically loaded from environment variables 
+    The root configuration object, typically loaded from environment variables
     prefixed with 'SOAR_'.
     """
 
@@ -419,8 +419,8 @@ class AppSettings(BaseSettings):
 def get_settings() -> AppSettings:
     """
     Returns a cached instance of the application settings.
-    
-    This is the primary way for components to access configuration, 
+
+    This is the primary way for components to access configuration,
     ensuring consistent state across the library.
     """
     return AppSettings()  # type: ignore[call-arg]
