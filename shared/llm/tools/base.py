@@ -204,7 +204,11 @@ class BaseTool(BaseModel):
         Useful for orchestration, experiments, and telemetry-heavy systems.
         """
         try:
-            validated_input = self.input_model.model_validate(kwargs)
+            try:
+                validated_input = self.input_model.model_validate(kwargs)
+            except ValidationError as exc:
+                raise ToolInputError(f"Invalid input for tool '{self.name}': {exc}") from exc
+
             estimated_cost = self.estimate_cost(validated_input)
             estimated_risk = self.estimate_risk(validated_input)
 

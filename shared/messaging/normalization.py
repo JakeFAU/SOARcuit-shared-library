@@ -42,8 +42,12 @@ def normalize_inbound_payload(payload: Mapping[str, object]) -> dict[str, object
         normalized["message_type"] = explicit_kind.strip().lower()
 
     if has_raw_shape(normalized):
+        if "message_type" not in normalized:
+            normalized["message_type"] = "raw_observation"
         return _normalize_kind_aliases(normalized, preserve_source_kind=True)
     if has_meme_shape(normalized):
+        if "message_type" not in normalized:
+            normalized["message_type"] = "meme"
         return _normalize_meme_payload(normalized)
 
     single_observation = _normalize_single_observation_envelope(normalized)

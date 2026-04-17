@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+from abc import ABC
 from enum import StrEnum
+from functools import lru_cache
 from typing import Final, Literal
 
 from pydantic import BaseModel, Field, SecretStr, model_validator
@@ -258,6 +260,54 @@ class GCPSettings(BaseModel):
     )
 
 
+class ProviderModels(BaseModel, ABC):
+    thinking_model: str
+    default_model: str
+    quick_model: str
+
+
+class OpenAIModels(ProviderModels):
+    thinking_model: str = Field(default="gpt-5.4", description="Thinking model for OpenAI.")
+    default_model: str = Field(default="gpt-5", description="Default model for OpenAI.")
+    quick_model: str = Field(default="gpt-5-mini", description="Quick model for OpenAI.")
+
+
+class GeminiModels(ProviderModels):
+    thinking_model: str = Field(
+        default="gemini-3.1-pro-preview", description="Thinking model for Gemini."
+    )
+    default_model: str = Field(
+        default="gemini-3-flash-preview", description="Default model for Gemini."
+    )
+    quick_model: str = Field(
+        default="gemini-3.1-flash-lite-preview", description="Quick model for Gemini."
+    )
+
+
+class AnthropicModels(ProviderModels):
+    thinking_model: str = Field(
+        default="claude-opus-4-7", description="Thinking model for Anthropic."
+    )
+    default_model: str = Field(
+        default="claude-sonnet-4-6", description="Default model for Anthropic."
+    )
+    quick_model: str = Field(default="claude-haiku-4-5", description="Quick model for Anthropic.")
+
+
+class ModelNames(BaseModel):
+    model_config = SettingsConfigDict(
+        env_prefix="SOAR_MODELS_",
+        env_nested_delimiter="__",
+        env_file=".env",
+        extra="ignore",
+        case_sensitive=False,
+    )
+
+    openai: OpenAIModels = Field(default_factory=OpenAIModels)
+    gemini: GeminiModels = Field(default_factory=GeminiModels)
+    anthropic: AnthropicModels = Field(default_factory=AnthropicModels)
+
+
 class AppSettings(BaseSettings):
     """Top-level application settings."""
 
@@ -272,3 +322,9 @@ class AppSettings(BaseSettings):
     database_settings: DatabaseSettings
     llm_settings: LLMSettings
     gcp_settings: GCPSettings
+    model_names: ModelNames
+
+
+@lru_cache(maxsize=1)
+def get_settings() -> AppSettings:
+    return AppSettings()  # type: ignore[call-arg]
