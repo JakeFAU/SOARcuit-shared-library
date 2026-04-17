@@ -1,11 +1,28 @@
+"""
+High-Level LLM Client (The Engine).
+
+This module provides the `ChatService` class, which acts as the unified orchestrator 
+for all LLM interactions in the SOARcuit system. It manages the lifecycle of 
+provider-specific SDK clients, handles model resolution based on tiered naming, 
+and integrates meticulously with the instrumentation layer.
+
+Design Goals:
+- Singleton Lifecycle: SDK clients are lazily instantiated and cached to optimize 
+  resource usage.
+- Unified Interface: Provides a single `chat()` and `chat_structured()` surface 
+  regardless of the underlying vendor.
+- First-Class Telemetry: Every call is wrapped in an OpenTelemetry span and 
+  returns granular `ActionStepMeasurement` data.
+"""
+
 from __future__ import annotations
 
-from typing import Any, cast
+from typing import Any, AsyncIterator, Callable, Protocol, TypeVar, cast
 from uuid import UUID
 
 from shared.infrastructure.logging import get_logger
-from shared.instrumentation.profiler import measure_step
 from shared.observability.tracer import get_tracer
+from shared.instrumentation.profiler import measure_step
 
 from ..config.config import LLMProvider as ProviderType
 from ..config.config import LLMSettings
@@ -21,17 +38,23 @@ tracer = get_tracer("llm_client")
 
 class ChatService:
     """
-    High-level service for interacting with LLMs.
-    Singletons for each provider are lazily instantiated and cached.
+    Orchestrator for Unified LLM Interactions.
+
+    ChatService is the primary entry point for models. It abstracts away 
+    the complexities of vendor-specific SDKs and provides a consistent, 
+    instrumented surface for both standard chat and structured JSON output.
+
+    Args:
+        settings: The LLMSettings object containing API keys and default models.
     """
 
     def __init__(self, settings: LLMSettings):
         self._settings = settings
-        # Cache for provider instances (Singletons per ChatService)
+        # Cache for provider instances (Singletons per ChatService instance)
         self._providers: dict[ProviderType, LLMProvider] = {}
 
     def _get_provider(self, provider_type: ProviderType) -> LLMProvider:
-        """Lazily instantiates and returns a cached provider."""
+        """Lazily instantiates and returns a cached provider instance."""
         if provider_type not in self._providers:
             match provider_type:
                 case ProviderType.OPENAI:
@@ -46,14 +69,14 @@ class ChatService:
 
     def _resolve_provider(self, model: str | None) -> tuple[LLMProvider, str | None]:
         """
-        Resolves the appropriate provider based on the model name.
-        If no model is provided, defaults to the configured default provider.
+        Resolves the appropriate provider based on the model name heuristic.
+        
+        If no model is provided, it falls back to the configured default provider.
         """
         if model is None:
             provider_type = self._settings.default_provider
             return self._get_provider(provider_type), self._settings.default_model
 
-        # Simple heuristic to resolve provider from model name
         model_lower = model.lower()
         if any(model_lower.startswith(p) for p in ("gpt", "o1", "o3")):
             return self._get_provider(ProviderType.OPENAI), model
@@ -62,7 +85,6 @@ class ChatService:
         if model_lower.startswith("gemini"):
             return self._get_provider(ProviderType.GEMINI), model
 
-        # Fallback to default provider with the specific model requested
         return self._get_provider(self._settings.default_provider), model
 
     async def chat(
@@ -74,45 +96,45 @@ class ChatService:
         **kwargs: Any,
     ) -> ChatResponse:
         """
-        Unified chat interface. Respects configuration defaults and handles instrumentation.
+        Executes a standard multi-turn chat completion.
+
+        Validates the request, resolves the provider, and instruments the 
+        execution. If decision_id and action_run_id are provided, it returns 
+        a ChatResponse enriched with an ActionStepMeasurement.
         """
         provider, resolved_model = self._resolve_provider(model)
         model_name = resolved_model or "default"
-
-        # Determine step name for instrumentation
+        
         provider_name = provider.__class__.__name__.replace("Provider", "").lower()
         step_name = f"model:{provider_name}:chat"
-
+        
         measurement = None
 
         with tracer.start_as_current_span("llm.chat") as span:
             span.set_attribute("llm.model", model_name)
             span.set_attribute("llm.message_count", len(messages))
-
+            
             logger.info("llm_chat_started", model=model_name)
-
+            
             if decision_id and action_run_id:
                 async with measure_step(
                     step_name=step_name,
                     decision_id=decision_id,
                     action_run_id=action_run_id,
-                    metadata={"model": model_name},
+                    metadata={"model": model_name}
                 ) as profiler:
                     response = await provider.chat(messages, model=resolved_model, **kwargs)
                     measurement = profiler.get_measurement()
-                    # Enrich measurement with token usage from response
                     measurement.input_tokens = response.usage.prompt_tokens
                     measurement.output_tokens = response.usage.completion_tokens
                     measurement.total_tokens = response.usage.total_tokens
             else:
                 response = await provider.chat(messages, model=resolved_model, **kwargs)
-
+            
             span.set_attribute("llm.usage.prompt_tokens", response.usage.prompt_tokens)
             span.set_attribute("llm.usage.completion_tokens", response.usage.completion_tokens)
-            logger.info(
-                "llm_chat_completed", model=response.model, tokens=response.usage.total_tokens
-            )
-
+            logger.info("llm_chat_completed", model=response.model, tokens=response.usage.total_tokens)
+            
             response.measurement = measurement
             return response
 
@@ -126,34 +148,31 @@ class ChatService:
         **kwargs: Any,
     ) -> T:
         """
-        Unified structured output interface. Handles instrumentation and returns enriched model.
-        Note: The returned T is a Pydantic model. We attach 'measurement' to it dynamically
-        if it's not already there, or return a wrapper if strictness is needed.
+        Executes a chat completion and parses the result into a Pydantic model.
+
+        Leverages native vendor features (e.g., OpenAI's Beta.Parse, Gemini's 
+        response_schema) where available to ensure the highest reliability.
         """
         provider, resolved_model = self._resolve_provider(model)
         model_name = resolved_model or "default"
-
+        
         provider_name = provider.__class__.__name__.replace("Provider", "").lower()
         step_name = f"model:{provider_name}:structured_output"
-
+        
         measurement = None
 
         with tracer.start_as_current_span("llm.chat_structured") as span:
             span.set_attribute("llm.model", model_name)
             span.set_attribute("llm.response_model", response_model.__name__)
-
-            logger.info(
-                "llm_structured_chat_started",
-                model=model_name,
-                target_model=response_model.__name__,
-            )
-
+            
+            logger.info("llm_structured_chat_started", model=model_name, target_model=response_model.__name__)
+            
             if decision_id and action_run_id:
                 async with measure_step(
                     step_name=step_name,
                     decision_id=decision_id,
                     action_run_id=action_run_id,
-                    metadata={"model": model_name, "response_model": response_model.__name__},
+                    metadata={"model": model_name, "response_model": response_model.__name__}
                 ) as profiler:
                     response = await provider.chat_structured(
                         messages, response_model=response_model, model=resolved_model, **kwargs
@@ -163,17 +182,13 @@ class ChatService:
                 response = await provider.chat_structured(
                     messages, response_model=response_model, model=resolved_model, **kwargs
                 )
-
+            
             logger.info("llm_structured_chat_completed")
-
-            # Attach measurement to the Pydantic instance if possible
-            if measurement and hasattr(response, "model_extra"):
-                # If using Pydantic v2 and allowing extra
-                if response.model_config.get("extra") == "allow":
+            
+            if measurement:
+                if hasattr(response, "model_extra") and response.model_config.get("extra") == "allow":
                     cast(Any, response).measurement = measurement
                 else:
                     cast(Any, response)._measurement = measurement
-            elif measurement:
-                cast(Any, response)._measurement = measurement
-
+                
             return response
