@@ -18,6 +18,7 @@ from __future__ import annotations
 from abc import ABC
 from enum import StrEnum
 from functools import lru_cache
+import os
 from typing import Final, Literal
 
 from pydantic import BaseModel, Field, SecretStr, model_validator
@@ -27,6 +28,14 @@ DEFAULT_CLOUD_SQL_INSTANCE: Final[str] = "soarcuit:us-east4:soarcuit-dev-us-east
 DEFAULT_DB_CONNECT_TIMEOUT_SECONDS: Final[int] = 30
 DEFAULT_DB_MIN_POOL_SIZE: Final[int] = 1
 DEFAULT_GCP_REGION: Final[str] = "us-east4"
+
+
+def _first_env(*names: str) -> str | None:
+    for name in names:
+        value = os.getenv(name)
+        if value is not None and value != "":
+            return value
+    return None
 
 
 class ConfigurationError(ValueError):
@@ -392,6 +401,119 @@ class ModelNames(BaseModel):
     anthropic: AnthropicModels = Field(default_factory=AnthropicModels)
 
 
+def _database_settings_from_env() -> dict[str, object] | None:
+    data: dict[str, object] = {}
+    env_map = {
+        "database": ("SOAR_DATABASE_SETTINGS__DATABASE", "THALAMUS_DB_NAME"),
+        "user": ("SOAR_DATABASE_SETTINGS__USER", "THALAMUS_DB_USER"),
+        "password": ("SOAR_DATABASE_SETTINGS__PASSWORD", "THALAMUS_DB_PASSWORD"),
+        "auth_mode": ("SOAR_DATABASE_SETTINGS__AUTH_MODE", "THALAMUS_DB_AUTH_MODE"),
+        "connection_mode": (
+            "SOAR_DATABASE_SETTINGS__CONNECTION_MODE",
+            "THALAMUS_DB_CONNECTION_MODE",
+        ),
+        "host": ("SOAR_DATABASE_SETTINGS__HOST", "THALAMUS_DB_HOST"),
+        "port": ("SOAR_DATABASE_SETTINGS__PORT", "THALAMUS_DB_PORT"),
+        "cloud_sql_instance": (
+            "SOAR_DATABASE_SETTINGS__CLOUD_SQL_INSTANCE",
+            "THALAMUS_DB_CLOUD_SQL_INSTANCE",
+        ),
+        "unix_socket_dir": (
+            "SOAR_DATABASE_SETTINGS__UNIX_SOCKET_DIR",
+            "THALAMUS_DB_UNIX_SOCKET_DIR",
+        ),
+        "min_pool_size": ("SOAR_DATABASE_SETTINGS__MIN_POOL_SIZE", "THALAMUS_DB_POOL_MIN_SIZE"),
+        "max_pool_size": ("SOAR_DATABASE_SETTINGS__MAX_POOL_SIZE", "THALAMUS_DB_POOL_MAX_SIZE"),
+        "connect_timeout": (
+            "SOAR_DATABASE_SETTINGS__CONNECT_TIMEOUT",
+            "THALAMUS_DB_CONNECT_TIMEOUT_SECONDS",
+        ),
+        "command_timeout": (
+            "SOAR_DATABASE_SETTINGS__COMMAND_TIMEOUT",
+            "THALAMUS_DB_COMMAND_TIMEOUT_SECONDS",
+        ),
+        "statement_cache_size": (
+            "SOAR_DATABASE_SETTINGS__STATEMENT_CACHE_SIZE",
+            "THALAMUS_DB_STATEMENT_CACHE_SIZE",
+        ),
+        "max_queries": ("SOAR_DATABASE_SETTINGS__MAX_QUERIES", "THALAMUS_DB_MAX_QUERIES"),
+        "max_inactive_connection_lifetime": (
+            "SOAR_DATABASE_SETTINGS__MAX_INACTIVE_CONNECTION_LIFETIME",
+            "THALAMUS_DB_MAX_INACTIVE_CONNECTION_LIFETIME",
+        ),
+        "enable_pgvector": (
+            "SOAR_DATABASE_SETTINGS__ENABLE_PGVECTOR",
+            "THALAMUS_DB_ENABLE_PGVECTOR",
+        ),
+    }
+    for field_name, env_names in env_map.items():
+        value = _first_env(*env_names)
+        if value is not None:
+            data[field_name] = value
+    return data or None
+
+
+def _llm_settings_from_env() -> dict[str, object] | None:
+    data: dict[str, object] = {}
+    env_map = {
+        "gemini_api_key": (
+            "SOAR_LLM_SETTINGS__GEMINI_API_KEY",
+            "GOOGLE_GENAI_KEY",
+            "GEMINI_API_KEY",
+            "THALAMUS_GOOGLE_GENAI_KEY",
+        ),
+        "openai_api_key": ("SOAR_LLM_SETTINGS__OPENAI_API_KEY", "OPENAI_API_KEY"),
+        "anthropic_api_key": ("SOAR_LLM_SETTINGS__ANTHROPIC_API_KEY", "ANTHROPIC_API_KEY"),
+        "default_provider": ("SOAR_LLM_SETTINGS__DEFAULT_PROVIDER",),
+        "default_gemini_model": ("SOAR_LLM_SETTINGS__DEFAULT_GEMINI_MODEL",),
+        "default_openai_model": ("SOAR_LLM_SETTINGS__DEFAULT_OPENAI_MODEL",),
+        "default_anthropic_model": ("SOAR_LLM_SETTINGS__DEFAULT_ANTHROPIC_MODEL",),
+        "embedding_provider": ("SOAR_LLM_SETTINGS__EMBEDDING_PROVIDER",),
+        "embedding_model": (
+            "SOAR_LLM_SETTINGS__EMBEDDING_MODEL",
+            "THALAMUS_EMBEDDING_MODEL",
+        ),
+        "embedding_dimension": (
+            "SOAR_LLM_SETTINGS__EMBEDDING_DIMENSION",
+            "THALAMUS_EMBEDDING_DIMS",
+        ),
+    }
+    for field_name, env_names in env_map.items():
+        value = _first_env(*env_names)
+        if value is not None:
+            data[field_name] = value
+    return data or None
+
+
+def _gcp_settings_from_env() -> dict[str, object] | None:
+    project_id = _first_env(
+        "SOAR_GCP_SETTINGS__PROJECT_ID",
+        "THALAMUS_GCP_PROJECT",
+        "GOOGLE_CLOUD_PROJECT",
+        "GCP_PROJECT",
+        "GCLOUD_PROJECT",
+    )
+    project_name = _first_env(
+        "SOAR_GCP_SETTINGS__PROJECT_NAME",
+        "THALAMUS_GCP_PROJECT_NAME",
+    )
+    default_region = _first_env(
+        "SOAR_GCP_SETTINGS__DEFAULT_REGION",
+        "THALAMUS_GCP_REGION",
+        "GOOGLE_CLOUD_REGION",
+    )
+
+    data: dict[str, object] = {}
+    if project_id is not None:
+        data["project_id"] = project_id
+        data["project_name"] = project_name or project_id
+    elif project_name is not None:
+        data["project_name"] = project_name
+    if default_region is not None:
+        data["default_region"] = default_region
+    return data or None
+
+
 class AppSettings(BaseSettings):
     """
     SOARcuit Unified Application Configuration.
@@ -411,8 +533,29 @@ class AppSettings(BaseSettings):
     database_settings: DatabaseSettings
     llm_settings: LLMSettings
     gcp_settings: GCPSettings
-    model_names: ModelNames
+    model_names: ModelNames = Field(default_factory=ModelNames)
     external_tools: ExternalToolSettings = Field(default_factory=ExternalToolSettings)
+
+    @model_validator(mode="before")
+    @classmethod
+    def populate_shared_settings_from_environment(cls, data: object) -> object:
+        if not isinstance(data, dict):
+            return data
+
+        values = dict(data)
+        if "database_settings" not in values:
+            database_settings = _database_settings_from_env()
+            if database_settings is not None:
+                values["database_settings"] = database_settings
+        if "llm_settings" not in values:
+            llm_settings = _llm_settings_from_env()
+            if llm_settings is not None:
+                values["llm_settings"] = llm_settings
+        if "gcp_settings" not in values:
+            gcp_settings = _gcp_settings_from_env()
+            if gcp_settings is not None:
+                values["gcp_settings"] = gcp_settings
+        return values
 
 
 @lru_cache(maxsize=1)
