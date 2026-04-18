@@ -44,7 +44,8 @@ ACTION_RUN_COLUMNS: Final[tuple[str, ...]] = (
 )
 ACTION_RUN_COLUMN_LIST: Final[str] = ", ".join(ACTION_RUN_COLUMNS)
 ACTION_RUN_PLACEHOLDERS: Final[str] = ", ".join(
-    f"${index}" for index in range(1, len(ACTION_RUN_COLUMNS) + 1)
+    f"${index}::jsonb" if column == "metadata" else f"${index}"
+    for index, column in enumerate(ACTION_RUN_COLUMNS, 1)
 )
 ACTION_RUN_SET_CLAUSE: Final[str] = ", ".join(
     f"{column} = EXCLUDED.{column}" for column in ACTION_RUN_COLUMNS if column != "id"
@@ -112,7 +113,8 @@ STEP_MEASUREMENT_COLUMNS: Final[tuple[str, ...]] = (
 )
 STEP_MEASUREMENT_COLUMN_LIST: Final[str] = ", ".join(STEP_MEASUREMENT_COLUMNS)
 STEP_MEASUREMENT_PLACEHOLDERS: Final[str] = ", ".join(
-    f"${index}" for index in range(1, len(STEP_MEASUREMENT_COLUMNS) + 1)
+    f"${index}::jsonb" if column == "metadata" else f"${index}"
+    for index, column in enumerate(STEP_MEASUREMENT_COLUMNS, 1)
 )
 STEP_MEASUREMENT_SET_CLAUSE: Final[str] = ", ".join(
     f"{column} = EXCLUDED.{column}" for column in STEP_MEASUREMENT_COLUMNS if column != "id"
