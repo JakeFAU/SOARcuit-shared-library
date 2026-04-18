@@ -1,57 +1,57 @@
-"""Consolidated inference helpers for DSPy-based analysts."""
+"""Consolidated inference helpers for domain inference."""
 
-import sys
-import types
 from typing import Any
 
 from structlog import get_logger
 
+from shared.config.config import AppSettings, LLMProvider, LLMSettings, get_settings
 from shared.domain.config import SOARcuitBaseSettings
+from shared.llm.client import ChatService
 
 logger = get_logger(__name__)
 
-try:
-    import dspy
-except ModuleNotFoundError:
-    dspy = types.ModuleType("dspy")
-
-    def _missing_dspy(*args: Any, **kwargs: Any) -> Any:
-        raise ModuleNotFoundError("dspy is not installed.")
-
-    dspy.LM = _missing_dspy  # type: ignore[attr-defined]
-    dspy.configure = _missing_dspy  # type: ignore[attr-defined]
-    sys.modules.setdefault("dspy", dspy)
-
 # Global cache for cold-start optimization
 _lm_initialized = False
+_chat_service: ChatService | None = None
 
 
-def configure_lm(settings: SOARcuitBaseSettings | None = None) -> None:
-    """Initialize DSPy using the environment variables or provided settings.
+def _resolve_llm_settings(
+    settings: SOARcuitBaseSettings | LLMSettings | AppSettings | None,
+) -> LLMSettings:
+    if settings is None:
+        return get_settings().llm_settings
+
+    if isinstance(settings, AppSettings):
+        return settings.llm_settings
+
+    if isinstance(settings, LLMSettings):
+        return settings
+
+    return LLMSettings(gemini_api_key=settings.google_genai_key)
+
+
+def configure_lm(
+    settings: SOARcuitBaseSettings | LLMSettings | AppSettings | None = None,
+) -> None:
+    """Initialize and cache the shared Gemini chat client.
 
     Args:
-        settings: Optional SOARcuitBaseSettings instance. If not provided,
-                 it will attempt to load from environment/YAML.
+        settings: Optional settings instance. If not provided, shared app
+            settings are loaded and the configured Gemini default model is used.
     """
     global _lm_initialized
+    global _chat_service
+
     if _lm_initialized:
         return
 
-    if settings is None:
-        try:
-            settings = SOARcuitBaseSettings()  # type: ignore[call-arg]
-        except Exception as e:
-            logger.error("Failed to load settings for LM configuration", error=str(e))
-            raise
-
-    model_name = settings.model_name
-    api_key = settings.google_genai_key.get_secret_value()
-
-    lm = dspy.LM(model=model_name, api_key=api_key)
-    dspy.configure(lm=lm)
+    llm_settings = _resolve_llm_settings(settings)
+    service = ChatService(llm_settings)
+    service._get_provider(LLMProvider.GEMINI)
+    _chat_service = service
     _lm_initialized = True
 
-    logger.info("DSPy LM configured", model_name=model_name)
+    logger.info("LLM client configured", model_name=llm_settings.default_gemini_model)
 
 
 def clean_observations(

@@ -76,6 +76,7 @@ def publish_memes(
     *,
     topic_path: str,
     source: str,
+    attributes: Mapping[str, str] | None = None,
 ) -> list[str]:
     """Publish memes to the downstream topic with tracing."""
     if not memes:
@@ -87,15 +88,19 @@ def publish_memes(
         futures = []
         for index, meme in enumerate(memes):
             payload = meme.to_message()
+            publish_attributes = {
+                "source": source,
+                "meme_count": str(len(memes)),
+                "meme_index": str(index),
+                "message_type": "meme",
+                "meme_id": str(meme.id),
+            }
+            publish_attributes.update(dict(attributes or {}))
             futures.append(
                 client.publish(
                     topic_path,
                     json.dumps(payload).encode("utf-8"),
-                    source=source,
-                    meme_count=str(len(memes)),
-                    meme_index=str(index),
-                    message_type="meme",
-                    meme_id=str(meme.id),
+                    **publish_attributes,
                 )
             )
         message_ids = [future.result(timeout=10) for future in futures]

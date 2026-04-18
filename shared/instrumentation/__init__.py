@@ -20,6 +20,7 @@ from .models import ActionRun, ActionStatus, ActionStepMeasurement
 from .naming import CanonicalName, InvalidCanonicalNameError
 from .profiler import Profiler, measure_step
 from .repository import (
+    AsyncpgInstrumentationRepository,
     InstrumentationRepository,
     ListInstrumentationRepository,
     LoggingInstrumentationRepository,
@@ -34,6 +35,7 @@ __all__ = [
     "ActionStepMeasurement",
     "CanonicalName",
     "InvalidCanonicalNameError",
+    "AsyncpgInstrumentationRepository",
     "InstrumentationRepository",
     "ListInstrumentationRepository",
     "LoggingInstrumentationRepository",
