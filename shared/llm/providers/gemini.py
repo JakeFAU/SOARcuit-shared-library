@@ -108,11 +108,22 @@ class GeminiProvider(LLMProvider):
         The Gemini API structured output implementation (via the Google GenAI SDK)
         raises a ValueError if 'additionalProperties' is present in the schema,
         even if set to True/False.
+
+        If a schema element indicates it is an object only via 'additionalProperties'
+        (with no fixed properties defined), we also strip the 'type' to make it
+        an 'Any' schema, allowing the model to produce arbitrary keys as requested
+        in the system prompt (e.g., for tool arguments).
         """
         if not isinstance(schema, dict):
             return
 
+        has_additional = "additionalProperties" in schema
         schema.pop("additionalProperties", None)
+
+        # If it was defined as an object primarily to support arbitrary properties,
+        # strip the type to allow any structure (equivalent to 'Any' schema).
+        if has_additional and "properties" not in schema and schema.get("type") == "object":
+            schema.pop("type", None)
 
         if "properties" in schema:
             for prop in schema["properties"].values():
