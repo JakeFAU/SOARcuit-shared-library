@@ -78,13 +78,18 @@ class GeminiProvider(LLMProvider):
         model = model or self._default_model
         system_instruction, contents = self._prepare_contents(messages)
 
+        # Prepare schema and strip additionalProperties as it's not supported by Gemini API.
+        # We convert the Pydantic model to a raw JSON schema dict first.
+        schema = response_model.model_json_schema()
+        self._strip_additional_properties(schema)
+
         response = await self.client.aio.models.generate_content(
             model=model,
             contents=contents,
             config=types.GenerateContentConfig(
                 system_instruction=system_instruction,
                 response_mime_type="application/json",
-                response_schema=response_model,
+                response_schema=schema,
                 **kwargs,
             ),
         )
@@ -95,3 +100,33 @@ class GeminiProvider(LLMProvider):
             )
 
         return response_model.model_validate_json(response.text)
+
+    def _strip_additional_properties(self, schema: Any) -> None:
+        """
+        Recursively strip 'additionalProperties' from a JSON schema.
+
+        The Gemini API structured output implementation (via the Google GenAI SDK)
+        raises a ValueError if 'additionalProperties' is present in the schema,
+        even if set to True/False.
+        """
+        if not isinstance(schema, dict):
+            return
+
+        schema.pop("additionalProperties", None)
+
+        if "properties" in schema:
+            for prop in schema["properties"].values():
+                self._strip_additional_properties(prop)
+
+        if "items" in schema:
+            self._strip_additional_properties(schema["items"])
+
+        if "$defs" in schema:
+            for d in schema["$defs"].values():
+                self._strip_additional_properties(d)
+
+        # Handle standard JSON schema combinators
+        for key in ("allOf", "anyOf", "oneOf"):
+            if key in schema:
+                for sub_schema in schema[key]:
+                    self._strip_additional_properties(sub_schema)
