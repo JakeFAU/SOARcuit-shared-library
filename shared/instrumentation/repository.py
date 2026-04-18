@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import typing
 from dataclasses import dataclass, field
 from typing import Final, Protocol, runtime_checkable
@@ -44,8 +45,7 @@ ACTION_RUN_COLUMNS: Final[tuple[str, ...]] = (
 )
 ACTION_RUN_COLUMN_LIST: Final[str] = ", ".join(ACTION_RUN_COLUMNS)
 ACTION_RUN_PLACEHOLDERS: Final[str] = ", ".join(
-    f"${index}::jsonb" if column == "metadata" else f"${index}"
-    for index, column in enumerate(ACTION_RUN_COLUMNS, 1)
+    f"${index}" for index in range(1, len(ACTION_RUN_COLUMNS) + 1)
 )
 ACTION_RUN_SET_CLAUSE: Final[str] = ", ".join(
     f"{column} = EXCLUDED.{column}" for column in ACTION_RUN_COLUMNS if column != "id"
@@ -113,8 +113,7 @@ STEP_MEASUREMENT_COLUMNS: Final[tuple[str, ...]] = (
 )
 STEP_MEASUREMENT_COLUMN_LIST: Final[str] = ", ".join(STEP_MEASUREMENT_COLUMNS)
 STEP_MEASUREMENT_PLACEHOLDERS: Final[str] = ", ".join(
-    f"${index}::jsonb" if column == "metadata" else f"${index}"
-    for index, column in enumerate(STEP_MEASUREMENT_COLUMNS, 1)
+    f"${index}" for index in range(1, len(STEP_MEASUREMENT_COLUMNS) + 1)
 )
 STEP_MEASUREMENT_SET_CLAUSE: Final[str] = ", ".join(
     f"{column} = EXCLUDED.{column}" for column in STEP_MEASUREMENT_COLUMNS if column != "id"
@@ -191,7 +190,10 @@ class AsyncpgInstrumentationRepository:
         from shared.infrastructure.persistence import acquire_connection
 
         record = run.to_record()
-        values = tuple(record[column] for column in ACTION_RUN_COLUMNS)
+        values = tuple(
+            json.dumps(record[column]) if column == "metadata" else record[column]
+            for column in ACTION_RUN_COLUMNS
+        )
 
         async with acquire_connection(db, config=self._config) as conn:
             await conn.execute(UPSERT_ACTION_RUN_SQL, *values)
@@ -205,7 +207,10 @@ class AsyncpgInstrumentationRepository:
         from shared.infrastructure.persistence import acquire_connection
 
         record = measurement.to_record()
-        values = tuple(record[column] for column in STEP_MEASUREMENT_COLUMNS)
+        values = tuple(
+            json.dumps(record[column]) if column == "metadata" else record[column]
+            for column in STEP_MEASUREMENT_COLUMNS
+        )
 
         async with acquire_connection(db, config=self._config) as conn:
             await conn.execute(UPSERT_STEP_MEASUREMENT_SQL, *values)
