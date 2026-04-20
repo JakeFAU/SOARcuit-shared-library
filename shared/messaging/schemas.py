@@ -1,6 +1,7 @@
 """Pydantic schemas for messaging."""
 
 from typing import Any, Literal
+from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -18,4 +19,5 @@ class RawObservation(BaseModel):
     dimension: str = Field(..., description="The analytical dimension.")
     evidence: str = Field(..., description="Supporting evidence from the source.")
     analyst: str = Field(..., description="The analyst that produced the observation.")
+    parent_meme_id: UUID | None = Field(default=None, description="The ID of the parent meme.")
     metadata: dict[str, Any] = Field(default_factory=dict, description="Additional metadata.")
