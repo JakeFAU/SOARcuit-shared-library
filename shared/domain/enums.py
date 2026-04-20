@@ -26,6 +26,8 @@ class MemeStatus(StrEnum):
     SUPERSEDED = "superseded"
     ARCHIVED = "archived"
     DELETED = "deleted"
+    COMPLETED = "completed"
+    EJECTED = "ejected"
 
 
 class MemeTruthState(StrEnum):
