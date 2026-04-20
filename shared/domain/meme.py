@@ -40,6 +40,7 @@ class RawObservation:
     dimension: str
     evidence: str
     analyst: str
+    parent_meme_id: UUID | None = None
     metadata: dict[str, Any] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
@@ -49,6 +50,7 @@ class RawObservation:
         self.dimension = require_text(self.dimension, "dimension")
         self.evidence = require_text(self.evidence, "evidence")
         self.analyst = require_text(self.analyst, "analyst")
+        self.parent_meme_id = optional_uuid(self.parent_meme_id, "parent_meme_id")
         self.metadata = require_mapping(self.metadata, "metadata")
 
     @classmethod
@@ -64,6 +66,7 @@ class RawObservation:
             dimension=require_text(payload.get("dimension"), "dimension"),
             evidence=require_text(payload.get("evidence"), "evidence"),
             analyst=require_text(payload.get("analyst"), "analyst"),
+            parent_meme_id=optional_uuid(payload.get("parent_meme_id"), "parent_meme_id"),
             metadata=require_mapping(payload.get("metadata"), "metadata"),
         )
 
@@ -188,6 +191,7 @@ class Meme:
             probability=observation.probability,
             kind=observation.kind.value,
             dimension=observation.dimension,
+            id=generate_id(),
             created_at=created_at,
             updated_at=created_at,
             embedding=embedding,
@@ -198,12 +202,19 @@ class Meme:
             novelty=default_novelty,
             decay_rate=default_decay_rate,
             expires_at=created_at + timedelta(days=expiration_days),
+            parent_meme_id=observation.parent_meme_id,
             source_type=observation.analyst,
             metadata={
                 "evidence": observation.evidence,
                 "observation_metadata": observation.metadata,
             },
         )
+
+    def update_content(self, new_content: str) -> None:
+        """Update the meme content and its corresponding hash."""
+        self.content = require_text(new_content, "content")
+        self.content_hash = sha256(self.content.encode("utf-8")).hexdigest()
+        self.updated_at = utc_now()
 
     def to_record(self) -> dict[str, Any]:
         """Return database-friendly values for the meme."""

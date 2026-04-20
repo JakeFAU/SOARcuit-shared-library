@@ -60,6 +60,7 @@ def build_outbound_observation(
         "dimension": str(observation.get("dimension", "")).strip(),
         "evidence": str(observation.get("evidence", "")).strip(),
         "analyst": analyst,
+        "parent_meme_id": observation.get("parent_meme_id"),
         "metadata": metadata,
     }
 
