@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "soarcuit-shared"
-version = "0.8.0"
+version = "0.8.1"
 description = "Shared canonical models and message parsing for SOARcuit services"
 readme = "README.md"
 requires-python = ">=3.14"
@@ -29,6 +29,7 @@ dependencies = [
     "regex>=2026.4.4",
     "httpx>=0.28.1",
     "psutil>=7.2.2",
+    "redis>=5.3.0",
 ]
 
 [dependency-groups]
@@ -58,6 +59,7 @@ dev = [
 
   # --- Mocking / test ergonomics ---
   "pytest-mock",
+  "fakeredis>=2.27.0",
 
   # --- HTTP testing (you’re using httpx) ---
   "respx",

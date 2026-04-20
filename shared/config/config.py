@@ -392,6 +392,14 @@ class ModelNames(BaseModel):
     anthropic: AnthropicModels = Field(default_factory=AnthropicModels)
 
 
+class RedisSettings(BaseModel):
+    """Configuration for Redis / Memorystore hop tracking."""
+
+    host: str = Field(default="localhost", description="Redis host.")
+    port: int = Field(default=6379, ge=1, le=65535, description="Redis port.")
+    hop_threshold: int = Field(default=5, ge=1, description="Max hops before circuit break.")
+
+
 class AppSettings(BaseSettings):
     """
     SOARcuit Unified Application Configuration.
@@ -411,6 +419,7 @@ class AppSettings(BaseSettings):
     database_settings: DatabaseSettings
     llm_settings: LLMSettings
     gcp_settings: GCPSettings
+    redis_settings: RedisSettings = Field(default_factory=RedisSettings)
     model_names: ModelNames = Field(default_factory=ModelNames)
     external_tools: ExternalToolSettings = Field(default_factory=ExternalToolSettings)
 
