@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "soarcuit-shared"
-version = "0.7.7"
+version = "0.7.8"
 description = "Shared canonical models and message parsing for SOARcuit services"
 readme = "README.md"
 requires-python = ">=3.14"
