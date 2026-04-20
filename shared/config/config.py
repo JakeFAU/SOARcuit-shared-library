@@ -395,7 +395,7 @@ class ModelNames(BaseModel):
 class RedisSettings(BaseModel):
     """Configuration for Redis / Memorystore hop tracking."""
 
-    host: str = Field(default="localhost", description="Redis host.")
+    host: str = Field(default="10.171.0.3", description="Redis host.")
     port: int = Field(default=6379, ge=1, le=65535, description="Redis port.")
     hop_threshold: int = Field(default=5, ge=1, description="Max hops before circuit break.")
 
